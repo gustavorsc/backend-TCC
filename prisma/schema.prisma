@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Usuario {
+  id              String    @id @default(uuid())
+  firebaseUid     String    @unique
+  nome            String
+  email           String    @unique
+  authProvider    String    // "password" | "google.com"
+  xpTotal         Int       @default(0)
+  streakAtual     Int       @default(0)
+  ultimaAtividade DateTime?
+  dataCriacao     DateTime  @default(now())
+
+  rotinas         Rotina[]
+  desafios        Desafio[]
+}
+
+model Rotina {
+  id                String   @id @default(uuid())
+  usuarioId         String
+  tema              String
+  descricao         String?
+  nivelConhecimento String?
+  tempoDisponivel   String?
+  frequencia        String?
+  progresso         Float    @default(0)
+  dataCriacao       DateTime @default(now())
+
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+  tarefas           Tarefa[]
+}
+
+model Tarefa {
+  id            String    @id @default(uuid())
+  rotinaId      String
+  titulo        String
+  descricao     String?
+  concluida     Boolean   @default(false)
+  dataConclusao DateTime?
+  xpConcedido   Int       @default(0)
+
+  rotina        Rotina    @relation(fields: [rotinaId], references: [id])
+}
+
+model Desafio {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  tema        String
+  conteudo    String
+  concluido   Boolean  @default(false)
+  dataCriacao DateTime @default(now())
+
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+}
