@@ -2,6 +2,7 @@ import { Tarefa } from "@prisma/client";
 import { AppError } from "../middlewares/errorHandler";
 import prisma from "../lib/prisma";
 import { buscarRotinaDoUsuarioOuFalhar, recalcularProgresso } from "./rotina.service";
+import { verificarDesafioAdaptativo } from "./desafio.service";
 import { AtualizarTarefaInput, CriarTarefaInput } from "../schemas/tarefa.schema";
 import { XP_POR_TAREFA } from "../utils/constants";
 import { calcularNovoStreak } from "../utils/streak";
@@ -83,23 +84,18 @@ export async function excluir(usuarioId: string, tarefaId: string): Promise<void
 }
 
 /**
- * PATCH /api/tarefas/:id/concluir (RF08, RN07–RN12). Idempotente: concluir uma
+ * PATCH /api/tarefas/:id/concluir (RF08, RN07–RN13). Idempotente: concluir uma
  * tarefa já concluída simplesmente a retorna, sem repetir XP/streak (RN09 — XP
  * só é concedido na conclusão, uma única vez).
  *
  * Executado numa transação interativa porque o cálculo do streak depende do
  * estado atual do usuário lido dentro da própria operação.
- *
- * RN13 (desafio adaptativo — 3 tarefas do mesmo tema atrasadas em 14 dias)
- * ainda não está implementada aqui: o schema de Tarefa não tem uma data de
- * criação/vencimento própria para definir "atrasada", só a da Rotina. Fica
- * pendente até essa definição ser confirmada.
  */
 export async function concluir(usuarioId: string, tarefaId: string): Promise<Tarefa> {
   return prisma.$transaction(async (tx) => {
     const tarefa = await tx.tarefa.findUnique({
       where: { id: tarefaId },
-      include: { rotina: { select: { usuarioId: true } } },
+      include: { rotina: { select: { usuarioId: true, tema: true } } },
     });
 
     if (!tarefa) {
@@ -134,6 +130,7 @@ export async function concluir(usuarioId: string, tarefaId: string): Promise<Tar
     });
 
     await recalcularProgresso(tarefa.rotinaId, tx);
+    await verificarDesafioAdaptativo(usuarioId, tarefa.rotina.tema, tx);
 
     return tarefaConcluida;
   });

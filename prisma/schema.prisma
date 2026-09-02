@@ -44,6 +44,7 @@ model Tarefa {
   titulo        String
   descricao     String?
   concluida     Boolean   @default(false)
+  dataCriacao   DateTime  @default(now())
   dataConclusao DateTime?
   xpConcedido   Int       @default(0)
 

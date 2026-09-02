@@ -17,6 +17,10 @@ jest.mock("../../src/lib/prisma", () => {
       findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
     },
+    desafio: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
     $transaction: jest.fn((arg: unknown) =>
       Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(client)
     ),
@@ -55,6 +59,7 @@ function tarefaFixture(overrides: Partial<Tarefa> = {}): Tarefa {
     titulo: "Ler capítulo 1",
     descricao: null,
     concluida: false,
+    dataCriacao: new Date("2026-08-01T00:00:00Z"),
     dataConclusao: null,
     xpConcedido: 0,
     ...overrides,
@@ -181,7 +186,7 @@ describe("tarefa.service", () => {
     it("concede XP, atualiza o streak e recalcula o progresso ao concluir", async () => {
       (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
         ...tarefaFixture(),
-        rotina: { usuarioId: USUARIO_ID },
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
       });
       (prisma.usuario.findUniqueOrThrow as jest.Mock).mockResolvedValue(
         usuarioFixture({ streakAtual: 2, ultimaAtividade: null })
@@ -189,7 +194,10 @@ describe("tarefa.service", () => {
       (prisma.tarefa.update as jest.Mock).mockResolvedValue(
         tarefaFixture({ concluida: true, xpConcedido: XP_POR_TAREFA })
       );
-      (prisma.tarefa.count as jest.Mock).mockResolvedValueOnce(1).mockResolvedValueOnce(1);
+      (prisma.tarefa.count as jest.Mock)
+        .mockResolvedValueOnce(1) // recalcularProgresso: total
+        .mockResolvedValueOnce(1) // recalcularProgresso: concluídas
+        .mockResolvedValueOnce(0); // RN13: tarefas atrasadas do mesmo tema
 
       const resultado = await tarefaService.concluir(USUARIO_ID, TAREFA_ID);
 
@@ -209,6 +217,49 @@ describe("tarefa.service", () => {
         data: { progresso: 100 },
       });
       expect(resultado.xpConcedido).toBe(XP_POR_TAREFA);
+      expect(prisma.desafio.create).not.toHaveBeenCalled();
+    });
+
+    it("RN13: cria um desafio adaptativo quando há 3+ tarefas atrasadas do mesmo tema", async () => {
+      (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
+        ...tarefaFixture(),
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
+      });
+      (prisma.usuario.findUniqueOrThrow as jest.Mock).mockResolvedValue(usuarioFixture());
+      (prisma.tarefa.update as jest.Mock).mockResolvedValue(
+        tarefaFixture({ concluida: true, xpConcedido: XP_POR_TAREFA })
+      );
+      (prisma.tarefa.count as jest.Mock)
+        .mockResolvedValueOnce(4) // recalcularProgresso: total
+        .mockResolvedValueOnce(1) // recalcularProgresso: concluídas
+        .mockResolvedValueOnce(3); // RN13: 3 tarefas atrasadas do mesmo tema
+      (prisma.desafio.findFirst as jest.Mock).mockResolvedValue(null); // sem desafio em aberto
+
+      await tarefaService.concluir(USUARIO_ID, TAREFA_ID);
+
+      expect(prisma.desafio.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ usuarioId: USUARIO_ID, tema: "Matemática" }),
+      });
+    });
+
+    it("RN13: não duplica desafio quando já existe um em aberto para o tema", async () => {
+      (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
+        ...tarefaFixture(),
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
+      });
+      (prisma.usuario.findUniqueOrThrow as jest.Mock).mockResolvedValue(usuarioFixture());
+      (prisma.tarefa.update as jest.Mock).mockResolvedValue(
+        tarefaFixture({ concluida: true, xpConcedido: XP_POR_TAREFA })
+      );
+      (prisma.tarefa.count as jest.Mock)
+        .mockResolvedValueOnce(4)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(3);
+      (prisma.desafio.findFirst as jest.Mock).mockResolvedValue({ id: "desafio-existente" });
+
+      await tarefaService.concluir(USUARIO_ID, TAREFA_ID);
+
+      expect(prisma.desafio.create).not.toHaveBeenCalled();
     });
   });
 });
