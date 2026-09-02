@@ -19,3 +19,12 @@ export async function deleteMe(req: Request, res: Response, next: NextFunction) 
     next(err);
   }
 }
+
+export async function getProgresso(req: Request, res: Response, next: NextFunction) {
+  try {
+    const progresso = await usuarioService.buscarProgresso(req.usuario!);
+    res.status(200).json(progresso);
+  } catch (err) {
+    next(err);
+  }
+}

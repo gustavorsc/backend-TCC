@@ -33,6 +33,27 @@ export function buscarPerfil(usuario: Usuario): PerfilUsuario {
   return paraPerfilPublico(usuario);
 }
 
+export interface ProgressoUsuario {
+  xpTotal: number;
+  streakAtual: number;
+  rotinas: { id: string; tema: string; progresso: number }[];
+}
+
+/** GET /api/usuarios/me/progresso (RF09, RF10) — XP, streak e progresso de cada rotina. */
+export async function buscarProgresso(usuario: Usuario): Promise<ProgressoUsuario> {
+  const rotinas = await prisma.rotina.findMany({
+    where: { usuarioId: usuario.id },
+    select: { id: true, tema: true, progresso: true },
+    orderBy: { dataCriacao: "desc" },
+  });
+
+  return {
+    xpTotal: usuario.xpTotal,
+    streakAtual: usuario.streakAtual,
+    rotinas,
+  };
+}
+
 /**
  * DELETE /api/usuarios/me (RNF02 — LGPD) — exclui a conta e todos os dados pessoais.
  * Apaga tarefas, rotinas e desafios do usuário antes do próprio registro, numa

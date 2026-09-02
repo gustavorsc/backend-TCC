@@ -4,7 +4,7 @@ jest.mock("../../src/lib/prisma", () => ({
   __esModule: true,
   default: {
     tarefa: { deleteMany: jest.fn() },
-    rotina: { deleteMany: jest.fn() },
+    rotina: { deleteMany: jest.fn(), findMany: jest.fn() },
     desafio: { deleteMany: jest.fn() },
     usuario: { delete: jest.fn() },
     $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
@@ -69,6 +69,26 @@ describe("usuario.service", () => {
       mockDeleteUser.mockRejectedValue(new Error("firebase indisponível"));
 
       await expect(usuarioService.excluirConta(usuarioFixture())).resolves.toBeUndefined();
+    });
+  });
+
+  describe("buscarProgresso", () => {
+    it("retorna xpTotal, streakAtual e o progresso de cada rotina do usuário", async () => {
+      const usuario = usuarioFixture();
+      (prisma.rotina.findMany as jest.Mock).mockResolvedValue([
+        { id: "rotina-1", tema: "Matemática", progresso: 50 },
+      ]);
+
+      const progresso = await usuarioService.buscarProgresso(usuario);
+
+      expect(prisma.rotina.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { usuarioId: usuario.id } })
+      );
+      expect(progresso).toEqual({
+        xpTotal: usuario.xpTotal,
+        streakAtual: usuario.streakAtual,
+        rotinas: [{ id: "rotina-1", tema: "Matemática", progresso: 50 }],
+      });
     });
   });
 });
