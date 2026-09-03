@@ -1,6 +1,16 @@
 import { NextFunction, Request, Response } from "express";
 import * as rotinaService from "../services/rotina.service";
 
+export async function chat(req: Request, res: Response, next: NextFunction) {
+  try {
+    const resultado = await rotinaService.processarChat(req.usuario!.id, req.body.mensagens);
+    const status = resultado.tipo === "rotina" ? 201 : 200;
+    res.status(status).json(resultado);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listar(req: Request, res: Response, next: NextFunction) {
   try {
     const rotinas = await rotinaService.listarPorUsuario(req.usuario!.id);

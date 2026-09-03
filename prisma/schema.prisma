@@ -21,6 +21,7 @@ model Usuario {
 
   rotinas         Rotina[]
   desafios        Desafio[]
+  usosIA          UsoIA[]
 }
 
 model Rotina {
@@ -60,4 +61,19 @@ model Desafio {
   dataCriacao DateTime @default(now())
 
   usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+}
+
+// RN15 — contador de chamadas à IA por usuário e por dia civil (UTC).
+// `dia` no formato "YYYY-MM-DD". Uma linha por usuário/dia; `contagem` é
+// incrementada a cada chamada liberada. Não é limpo automaticamente — linhas
+// antigas servem de histórico de uso da IA.
+model UsoIA {
+  id        String @id @default(uuid())
+  usuarioId String
+  dia       String
+  contagem  Int    @default(0)
+
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, dia])
 }
