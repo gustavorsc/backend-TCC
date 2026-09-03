@@ -7,7 +7,7 @@ import usuarioRoute from "./usuario.route";
 
 /**
  * Agregador das rotas autenticadas da API (montado em /api, atrás do authMiddleware).
- * A rota de chat com IA é adicionada aqui quando implementada — ver tabela de
+ * O chat com IA (POST /api/rotinas/chat) vive em rotina.route — ver tabela de
  * contrato no CLAUDE.md.
  */
 const apiRouter = Router();
