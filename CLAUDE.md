@@ -105,7 +105,20 @@ model Desafio {
 
   usuario     Usuario  @relation(fields: [usuarioId], references: [id])
 }
+
+model UsoIA {
+  id        String  @id @default(uuid())
+  usuarioId String
+  dia       String   // "YYYY-MM-DD" (UTC) — janela diária da RN15
+  contagem  Int      @default(0)
+
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, dia])
+}
 ```
+
+`UsoIA` implementa o contador da RN15: uma linha por usuário/dia, `contagem` incrementada (atômica, via `upsert`) a cada chamada liberada em `POST /api/rotinas/chat`. Linhas antigas não são limpas por rotina (servem de histórico de uso da IA), mas são apagadas junto com a conta em `DELETE /api/usuarios/me` (FK `onDelete: Restrict`). `Usuario` ganhou a relação `usosIA UsoIA[]`.
 
 Ranking não é tabela: consulta somando `Tarefa.xpConcedido` de tarefas com `dataConclusao` na semana corrente (segunda a domingo), agrupado por usuário via `Rotina.usuarioId` (RN14).
 
@@ -130,7 +143,7 @@ Mantenha esta seção atualizada conforme as rotas forem implementadas — é a 
 | DELETE | `/api/usuarios/me` | Exclui conta e dados pessoais | RNF02 (LGPD) |
 | GET | `/api/usuarios/me/progresso` | XP total, streak, progresso das rotinas | RF09, RF10 |
 | GET | `/api/ranking` | Ranking semanal (todos os usuários) | RN14 |
-| POST | `/api/rotinas/chat` | Envia mensagem no chat; retorna pergunta de complemento OU rotina gerada | RF03, RF12, RN10, RN15 |
+| POST | `/api/rotinas/chat` | Envia a conversa (`{ mensagens: [{ role, content }] }`, sem histórico no backend); resposta `200 {tipo:"pergunta", mensagem, chamadasRestantes}` OU `201 {tipo:"rotina", rotina, chamadasRestantes}` (rotina + tarefas já persistidas). `429` se estourar RN15, `502 IA_RESPOSTA_INVALIDA` se o retorno da IA falhar na validação (RN10), `503 IA_INDISPONIVEL` se a OpenAI falhar | RF03, RF12, RN10, RN15 |
 | GET | `/api/rotinas` | Lista rotinas do usuário autenticado | RF04, RN04 |
 | GET | `/api/rotinas/:id` | Detalhe da rotina com tarefas | RF04, RN04 |
 | PUT | `/api/rotinas/:id` | Edita rotina | RF05, RN05 |
@@ -152,14 +165,16 @@ Nunca vazar stack trace ou detalhes internos na resposta. Códigos HTTP: `400` v
 
 ## Regras de negócio — respeitar sempre
 
-RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período · RN16 notificar risco de quebra de streak · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui.
+RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil (UTC)**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui.
 
 ## Integração com a OpenAI — pontos de atenção (RNF06, RNF10)
 
-- Toda chamada precisa de **timeout** configurado — nunca deixar a requisição pendurada indefinidamente.
-- Envolver em try/catch com mensagem de erro amigável — nunca propagar erro cru da OpenAI pro frontend.
-- Validar estruturalmente o retorno (RN10) antes de persistir: a rotina gerada precisa ter ao menos 1 tarefa (RN03), campos obrigatórios presentes.
-- Implementar contador de uso por usuário/dia (RN15, valor exato a definir) antes de liberar a chamada — checar o limite **antes** de gastar a chamada à API, não depois.
+Implementado no fluxo `POST /api/rotinas/chat`: `services/ia.service.ts` (chamada + validação), `services/usoIA.service.ts` (RN15), orquestração em `services/rotina.service.ts` (`processarChat`). Modelo em `OPENAI_MODEL` (default `gpt-4o-mini`).
+
+- Timeout de 30s configurado no client (`lib/openai.ts`, `OPENAI_TIMEOUT_MS`) — toda chamada herda.
+- `ia.service` captura qualquer erro da OpenAI e devolve `503 IA_INDISPONIVEL`; nunca propaga erro cru.
+- Retorno da IA (`response_format: json_object`) validado com Zod (`respostaIASchema` em `schemas/chat.schema.ts`) antes de persistir — rotina precisa de ≥1 tarefa (RN03); falha → `502 IA_RESPOSTA_INVALIDA` (RN10).
+- RN15: `reservarChamadaIA` incrementa `UsoIA` e falha com `429` **antes** de chamar a OpenAI. Limite em `IA_LIMITE_DIARIO` (`utils/constants.ts`).
 
 ## Convenções de código
 
@@ -187,6 +202,7 @@ FIREBASE_PROJECT_ID=
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
 OPENAI_API_KEY=
+OPENAI_MODEL=        # opcional, default gpt-4o-mini
 ```
 
 ## O que NUNCA fazer sem perguntar antes

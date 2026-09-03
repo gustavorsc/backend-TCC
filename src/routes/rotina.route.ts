@@ -4,9 +4,11 @@ import * as tarefaController from "../controllers/tarefa.controller";
 import { validateBody } from "../utils/validate";
 import { atualizarRotinaSchema } from "../schemas/rotina.schema";
 import { criarTarefaSchema } from "../schemas/tarefa.schema";
+import { chatSchema } from "../schemas/chat.schema";
 
 const router = Router();
 
+router.post("/chat", validateBody(chatSchema), rotinaController.chat);
 router.get("/", rotinaController.listar);
 router.get("/:id", rotinaController.buscarDetalhe);
 router.put("/:id", validateBody(atualizarRotinaSchema), rotinaController.atualizar);

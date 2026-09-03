@@ -64,6 +64,7 @@ export async function excluirConta(usuario: Usuario): Promise<void> {
     prisma.tarefa.deleteMany({ where: { rotina: { usuarioId: usuario.id } } }),
     prisma.rotina.deleteMany({ where: { usuarioId: usuario.id } }),
     prisma.desafio.deleteMany({ where: { usuarioId: usuario.id } }),
+    prisma.usoIA.deleteMany({ where: { usuarioId: usuario.id } }),
     prisma.usuario.delete({ where: { id: usuario.id } }),
   ]);
 
