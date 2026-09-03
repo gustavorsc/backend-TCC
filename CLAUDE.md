@@ -141,7 +141,7 @@ Mantenha esta seção atualizada conforme as rotas forem implementadas — é a 
 | GET | `/health` | Healthcheck, sem auth | — |
 | GET | `/api/usuarios/me` | Perfil do usuário autenticado (XP, streak) | RF01, RF02 |
 | DELETE | `/api/usuarios/me` | Exclui conta e dados pessoais | RNF02 (LGPD) |
-| GET | `/api/usuarios/me/progresso` | XP total, streak, progresso das rotinas | RF09, RF10 |
+| GET | `/api/usuarios/me/progresso` | XP total, streak, `streakEmRisco` (RN16), progresso das rotinas | RF09, RF10, RN16 |
 | GET | `/api/ranking` | Ranking semanal (todos os usuários) | RN14 |
 | POST | `/api/rotinas/chat` | Envia a conversa (`{ mensagens: [{ role, content }] }`, sem histórico no backend); resposta `200 {tipo:"pergunta", mensagem, chamadasRestantes}` OU `201 {tipo:"rotina", rotina, chamadasRestantes}` (rotina + tarefas já persistidas). `429` se estourar RN15, `502 IA_RESPOSTA_INVALIDA` se o retorno da IA falhar na validação (RN10), `503 IA_INDISPONIVEL` se a OpenAI falhar | RF03, RF12, RN10, RN15 |
 | GET | `/api/rotinas` | Lista rotinas do usuário autenticado | RF04, RN04 |
@@ -165,16 +165,24 @@ Nunca vazar stack trace ou detalhes internos na resposta. Códigos HTTP: `400` v
 
 ## Regras de negócio — respeitar sempre
 
-RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil (UTC)**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui.
+RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) — **o conteúdo do desafio é gerado pela IA** (`ia.service.gerarDesafioAdaptativo`, validado por Zod, RN10); a checagem roda como efeito colateral best-effort de concluir tarefa, **fora da transação** (`desafio.service.processarDesafioAdaptativo`), e **não conta no limite da RN15** · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak — backend expõe `streakEmRisco` (bool) em `GET /api/usuarios/me/progresso`; `true` quando `streakAtual > 0` e a última atividade não foi hoje (`utils/streak.streakEmRisco`) · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui.
+
+**Dia civil / fuso:** todo cálculo de "dia civil" e de semana (streak RN12, contador diário RN15, semana do ranking RN14) usa o fuso **America/Sao_Paulo** (UTC−3 fixo — Brasil sem horário de verão), centralizado em `utils/tempo.ts` (`diaCivil`, `diferencaEmDiasCivis`, `limitesDaSemanaAtual`).
 
 ## Integração com a OpenAI — pontos de atenção (RNF06, RNF10)
 
-Implementado no fluxo `POST /api/rotinas/chat`: `services/ia.service.ts` (chamada + validação), `services/usoIA.service.ts` (RN15), orquestração em `services/rotina.service.ts` (`processarChat`). Modelo em `OPENAI_MODEL` (default `gpt-4o-mini`).
+Duas chamadas à IA, ambas em `services/ia.service.ts` (helper comum `pedirJSON`: chama a OpenAI pedindo JSON, faz `JSON.parse`, valida com um schema Zod):
+
+1. **Chat de rotina** — `POST /api/rotinas/chat`, orquestrado em `services/rotina.service.ts` (`processarChat`); limite RN15 em `services/usoIA.service.ts`.
+2. **Desafio adaptativo (RN13)** — `gerarDesafioAdaptativo`, chamado por `desafio.service.processarDesafioAdaptativo` como efeito colateral best-effort de concluir tarefa. **Não passa pelo limite da RN15.**
+
+Modelo em `OPENAI_MODEL` (default `gpt-4o-mini`).
 
 - Timeout de 30s configurado no client (`lib/openai.ts`, `OPENAI_TIMEOUT_MS`) — toda chamada herda.
 - `ia.service` captura qualquer erro da OpenAI e devolve `503 IA_INDISPONIVEL`; nunca propaga erro cru.
-- Retorno da IA (`response_format: json_object`) validado com Zod (`respostaIASchema` em `schemas/chat.schema.ts`) antes de persistir — rotina precisa de ≥1 tarefa (RN03); falha → `502 IA_RESPOSTA_INVALIDA` (RN10).
+- Retorno da IA (`response_format: json_object`) validado com Zod antes de persistir (`respostaIASchema` em `schemas/chat.schema.ts`, `desafioGeradoSchema` em `schemas/desafio.schema.ts`) — rotina precisa de ≥1 tarefa (RN03); falha → `502 IA_RESPOSTA_INVALIDA` (RN10).
 - RN15: `reservarChamadaIA` incrementa `UsoIA` e falha com `429` **antes** de chamar a OpenAI. Limite em `IA_LIMITE_DIARIO` (`utils/constants.ts`).
+- Concluir tarefa nunca falha por causa da IA: `processarDesafioAdaptativo` roda fora da transação e engole erros (loga e segue).
 
 ## Convenções de código
 

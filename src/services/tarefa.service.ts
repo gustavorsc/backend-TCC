@@ -2,7 +2,7 @@ import { Tarefa } from "@prisma/client";
 import { AppError } from "../middlewares/errorHandler";
 import prisma from "../lib/prisma";
 import { buscarRotinaDoUsuarioOuFalhar, recalcularProgresso } from "./rotina.service";
-import { verificarDesafioAdaptativo } from "./desafio.service";
+import { processarDesafioAdaptativo } from "./desafio.service";
 import { AtualizarTarefaInput, CriarTarefaInput } from "../schemas/tarefa.schema";
 import { XP_POR_TAREFA } from "../utils/constants";
 import { calcularNovoStreak } from "../utils/streak";
@@ -88,11 +88,13 @@ export async function excluir(usuarioId: string, tarefaId: string): Promise<void
  * tarefa já concluída simplesmente a retorna, sem repetir XP/streak (RN09 — XP
  * só é concedido na conclusão, uma única vez).
  *
- * Executado numa transação interativa porque o cálculo do streak depende do
- * estado atual do usuário lido dentro da própria operação.
+ * XP, streak e progresso são atualizados numa transação interativa (o streak
+ * depende do estado atual do usuário lido dentro da operação). A checagem do
+ * desafio adaptativo (RN13) roda DEPOIS do commit, fora da transação, porque
+ * envolve uma chamada à OpenAI — ver processarDesafioAdaptativo.
  */
 export async function concluir(usuarioId: string, tarefaId: string): Promise<Tarefa> {
-  return prisma.$transaction(async (tx) => {
+  const { tarefa, temaParaDesafio } = await prisma.$transaction(async (tx) => {
     const tarefa = await tx.tarefa.findUnique({
       where: { id: tarefaId },
       include: { rotina: { select: { usuarioId: true, tema: true } } },
@@ -107,7 +109,7 @@ export async function concluir(usuarioId: string, tarefaId: string): Promise<Tar
     }
 
     if (tarefa.concluida) {
-      return tarefa;
+      return { tarefa, temaParaDesafio: null as string | null };
     }
 
     const usuario = await tx.usuario.findUniqueOrThrow({ where: { id: usuarioId } });
@@ -130,8 +132,13 @@ export async function concluir(usuarioId: string, tarefaId: string): Promise<Tar
     });
 
     await recalcularProgresso(tarefa.rotinaId, tx);
-    await verificarDesafioAdaptativo(usuarioId, tarefa.rotina.tema, tx);
 
-    return tarefaConcluida;
+    return { tarefa: tarefaConcluida, temaParaDesafio: tarefa.rotina.tema };
   });
+
+  if (temaParaDesafio) {
+    await processarDesafioAdaptativo(usuarioId, temaParaDesafio);
+  }
+
+  return tarefa;
 }

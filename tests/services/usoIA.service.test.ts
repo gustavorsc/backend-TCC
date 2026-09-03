@@ -12,12 +12,6 @@ const USUARIO_ID = "usuario-1";
 describe("usoIA.service", () => {
   afterEach(() => jest.clearAllMocks());
 
-  describe("diaUTC", () => {
-    it("formata a data como YYYY-MM-DD em UTC", () => {
-      expect(usoIA.diaUTC(new Date("2026-09-03T23:30:00Z"))).toBe("2026-09-03");
-    });
-  });
-
   describe("reservarChamadaIA", () => {
     it("incrementa o contador do dia e retorna as chamadas restantes", async () => {
       (prisma.usoIA.upsert as jest.Mock).mockResolvedValue({ contagem: 1 });

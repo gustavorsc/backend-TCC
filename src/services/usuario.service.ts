@@ -1,6 +1,7 @@
 import { Usuario } from "@prisma/client";
 import firebaseAdmin from "../lib/firebase-admin";
 import prisma from "../lib/prisma";
+import { streakEmRisco } from "../utils/streak";
 
 /**
  * Formato público do usuário devolvido pela API — nunca expor firebaseUid,
@@ -36,10 +37,12 @@ export function buscarPerfil(usuario: Usuario): PerfilUsuario {
 export interface ProgressoUsuario {
   xpTotal: number;
   streakAtual: number;
+  /** RN16 — true quando há streak ativo e nenhuma tarefa concluída ainda hoje. */
+  streakEmRisco: boolean;
   rotinas: { id: string; tema: string; progresso: number }[];
 }
 
-/** GET /api/usuarios/me/progresso (RF09, RF10) — XP, streak e progresso de cada rotina. */
+/** GET /api/usuarios/me/progresso (RF09, RF10, RN16) — XP, streak, risco de streak e progresso de cada rotina. */
 export async function buscarProgresso(usuario: Usuario): Promise<ProgressoUsuario> {
   const rotinas = await prisma.rotina.findMany({
     where: { usuarioId: usuario.id },
@@ -50,6 +53,7 @@ export async function buscarProgresso(usuario: Usuario): Promise<ProgressoUsuari
   return {
     xpTotal: usuario.xpTotal,
     streakAtual: usuario.streakAtual,
+    streakEmRisco: streakEmRisco(usuario.streakAtual, usuario.ultimaAtividade, new Date()),
     rotinas,
   };
 }

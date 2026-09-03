@@ -28,8 +28,14 @@ jest.mock("../../src/lib/prisma", () => {
   return { __esModule: true, default: client };
 });
 
+jest.mock("../../src/services/ia.service", () => ({
+  __esModule: true,
+  gerarDesafioAdaptativo: jest.fn(),
+}));
+
 import prisma from "../../src/lib/prisma";
 import * as tarefaService from "../../src/services/tarefa.service";
+import { gerarDesafioAdaptativo } from "../../src/services/ia.service";
 import { XP_POR_TAREFA } from "../../src/utils/constants";
 
 const USUARIO_ID = "usuario-1";
@@ -220,7 +226,7 @@ describe("tarefa.service", () => {
       expect(prisma.desafio.create).not.toHaveBeenCalled();
     });
 
-    it("RN13: cria um desafio adaptativo quando há 3+ tarefas atrasadas do mesmo tema", async () => {
+    it("RN13: gera o desafio pela IA e persiste quando há 3+ tarefas atrasadas do mesmo tema", async () => {
       (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
         ...tarefaFixture(),
         rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
@@ -234,12 +240,43 @@ describe("tarefa.service", () => {
         .mockResolvedValueOnce(1) // recalcularProgresso: concluídas
         .mockResolvedValueOnce(3); // RN13: 3 tarefas atrasadas do mesmo tema
       (prisma.desafio.findFirst as jest.Mock).mockResolvedValue(null); // sem desafio em aberto
+      (gerarDesafioAdaptativo as jest.Mock).mockResolvedValue({
+        titulo: "Retomada de Matemática",
+        conteudo: "Objetivo: revisar frações.\n1. ...",
+      });
 
       await tarefaService.concluir(USUARIO_ID, TAREFA_ID);
 
+      expect(gerarDesafioAdaptativo).toHaveBeenCalledWith("Matemática", 3);
       expect(prisma.desafio.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ usuarioId: USUARIO_ID, tema: "Matemática" }),
+        data: {
+          usuarioId: USUARIO_ID,
+          tema: "Matemática",
+          conteudo: "Retomada de Matemática\n\nObjetivo: revisar frações.\n1. ...",
+        },
       });
+    });
+
+    it("RN13: se a IA falhar, a conclusão da tarefa não quebra e nenhum desafio é criado", async () => {
+      (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
+        ...tarefaFixture(),
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
+      });
+      (prisma.usuario.findUniqueOrThrow as jest.Mock).mockResolvedValue(usuarioFixture());
+      (prisma.tarefa.update as jest.Mock).mockResolvedValue(
+        tarefaFixture({ concluida: true, xpConcedido: XP_POR_TAREFA })
+      );
+      (prisma.tarefa.count as jest.Mock)
+        .mockResolvedValueOnce(4)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(3);
+      (prisma.desafio.findFirst as jest.Mock).mockResolvedValue(null);
+      (gerarDesafioAdaptativo as jest.Mock).mockRejectedValue(new Error("IA fora do ar"));
+
+      const resultado = await tarefaService.concluir(USUARIO_ID, TAREFA_ID);
+
+      expect(resultado.concluida).toBe(true);
+      expect(prisma.desafio.create).not.toHaveBeenCalled();
     });
 
     it("RN13: não duplica desafio quando já existe um em aberto para o tema", async () => {

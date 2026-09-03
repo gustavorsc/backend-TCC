@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma";
-import { limitesDaSemanaAtual } from "../utils/semana";
+import { limitesDaSemanaAtual } from "../utils/tempo";
 
 export interface PosicaoRanking {
   usuarioId: string;

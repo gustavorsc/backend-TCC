@@ -1,9 +1,11 @@
+import { diferencaEmDiasCivis } from "./tempo";
+
 /**
  * RN12 — streak: mantido com ≥1 tarefa concluída por dia civil, zera sem conclusão.
  *
  * Calcula o novo streak a partir da última atividade registrada, no momento em
- * que uma tarefa é concluída. Comparação por dia civil em UTC (independente do
- * fuso do servidor).
+ * que uma tarefa é concluída. Comparação por dia civil no fuso de São Paulo
+ * (ver utils/tempo.ts).
  *
  * - Sem atividade anterior: começa em 1.
  * - Mesmo dia civil da última atividade: streak inalterado (mínimo 1) — a
@@ -33,10 +35,18 @@ export function calcularNovoStreak(
   return 1;
 }
 
-function diferencaEmDiasCivis(de: Date, para: Date): number {
-  const MS_POR_DIA = 24 * 60 * 60 * 1000;
-  const inicioDe = Date.UTC(de.getUTCFullYear(), de.getUTCMonth(), de.getUTCDate());
-  const inicioPara = Date.UTC(para.getUTCFullYear(), para.getUTCMonth(), para.getUTCDate());
+/**
+ * RN16 — o streak está em risco quando há um streak ativo mas nenhuma tarefa
+ * foi concluída ainda no dia civil corrente: mais um dia sem conclusão zera.
+ */
+export function streakEmRisco(
+  streakAtual: number,
+  ultimaAtividade: Date | null,
+  agora: Date
+): boolean {
+  if (streakAtual <= 0 || !ultimaAtividade) {
+    return false;
+  }
 
-  return Math.round((inicioPara - inicioDe) / MS_POR_DIA);
+  return diferencaEmDiasCivis(ultimaAtividade, agora) >= 1;
 }

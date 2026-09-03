@@ -1,6 +1,7 @@
-import { Desafio, Prisma } from "@prisma/client";
+import { Desafio } from "@prisma/client";
 import { AppError } from "../middlewares/errorHandler";
 import prisma from "../lib/prisma";
+import { gerarDesafioAdaptativo } from "./ia.service";
 
 const QUATORZE_DIAS_EM_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -32,19 +33,14 @@ export async function concluir(usuarioId: string, desafioId: string): Promise<De
 }
 
 /**
- * RN13 — desafio adaptativo: quando o usuário tem 3+ tarefas do mesmo tema
- * ainda não concluídas e criadas há 14+ dias, gera um desafio para esse tema
- * (se ainda não houver um em aberto). Chamada como efeito colateral de
- * concluir uma tarefa (ver tarefa.service), dentro da mesma transação.
+ * RN13 — condição do desafio adaptativo: 3+ tarefas do mesmo tema ainda não
+ * concluídas e criadas há 14+ dias, e nenhum desafio em aberto para esse tema.
+ * Retorna quantas tarefas estão atrasadas quando deve gerar; 0 caso contrário.
  */
-export async function verificarDesafioAdaptativo(
-  usuarioId: string,
-  tema: string,
-  client: Prisma.TransactionClient | typeof prisma = prisma
-): Promise<void> {
+async function avaliarCondicao(usuarioId: string, tema: string): Promise<number> {
   const limite = new Date(Date.now() - QUATORZE_DIAS_EM_MS);
 
-  const tarefasAtrasadas = await client.tarefa.count({
+  const tarefasAtrasadas = await prisma.tarefa.count({
     where: {
       concluida: false,
       dataCriacao: { lte: limite },
@@ -53,22 +49,45 @@ export async function verificarDesafioAdaptativo(
   });
 
   if (tarefasAtrasadas < 3) {
-    return;
+    return 0;
   }
 
-  const desafioEmAberto = await client.desafio.findFirst({
+  const desafioEmAberto = await prisma.desafio.findFirst({
     where: { usuarioId, tema, concluido: false },
   });
 
-  if (desafioEmAberto) {
-    return;
-  }
+  return desafioEmAberto ? 0 : tarefasAtrasadas;
+}
 
-  await client.desafio.create({
-    data: {
-      usuarioId,
-      tema,
-      conteudo: `Você tem ${tarefasAtrasadas} tarefas de "${tema}" atrasadas há mais de 14 dias. Que tal um desafio para retomar o ritmo?`,
-    },
-  });
+/**
+ * RN13 — verifica a condição do desafio adaptativo e, se atendida, pede o
+ * conteúdo à IA (RN10) e persiste o desafio.
+ *
+ * Roda como efeito colateral de concluir uma tarefa (ver tarefa.service), mas
+ * FORA da transação: envolve uma chamada de rede à OpenAI, que não pode segurar
+ * a transação aberta nem fazer a conclusão da tarefa falhar. Best-effort — se a
+ * IA falhar, o desafio simplesmente não é criado desta vez e a condição volta a
+ * ser checada na próxima conclusão de tarefa do mesmo tema.
+ */
+export async function processarDesafioAdaptativo(
+  usuarioId: string,
+  tema: string
+): Promise<void> {
+  try {
+    const tarefasAtrasadas = await avaliarCondicao(usuarioId, tema);
+    if (tarefasAtrasadas === 0) {
+      return;
+    }
+
+    const { titulo, conteudo } = await gerarDesafioAdaptativo(tema, tarefasAtrasadas);
+
+    await prisma.desafio.create({
+      data: { usuarioId, tema, conteudo: `${titulo}\n\n${conteudo}` },
+    });
+  } catch (err) {
+    console.error(
+      `[desafio.service] falha ao gerar desafio adaptativo (usuário ${usuarioId}, tema "${tema}"):`,
+      err
+    );
+  }
 }

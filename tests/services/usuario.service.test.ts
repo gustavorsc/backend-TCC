@@ -75,8 +75,9 @@ describe("usuario.service", () => {
   });
 
   describe("buscarProgresso", () => {
-    it("retorna xpTotal, streakAtual e o progresso de cada rotina do usuário", async () => {
-      const usuario = usuarioFixture();
+    it("retorna xpTotal, streakAtual, progresso das rotinas e o risco de streak", async () => {
+      // streak ativo com última atividade em dia bem anterior -> em risco (RN16)
+      const usuario = usuarioFixture({ streakAtual: 3, ultimaAtividade: new Date("2026-08-30T00:00:00Z") });
       (prisma.rotina.findMany as jest.Mock).mockResolvedValue([
         { id: "rotina-1", tema: "Matemática", progresso: 50 },
       ]);
@@ -88,9 +89,19 @@ describe("usuario.service", () => {
       );
       expect(progresso).toEqual({
         xpTotal: usuario.xpTotal,
-        streakAtual: usuario.streakAtual,
+        streakAtual: 3,
+        streakEmRisco: true,
         rotinas: [{ id: "rotina-1", tema: "Matemática", progresso: 50 }],
       });
+    });
+
+    it("RN16: streak não está em risco quando houve conclusão hoje", async () => {
+      const usuario = usuarioFixture({ streakAtual: 4, ultimaAtividade: new Date() });
+      (prisma.rotina.findMany as jest.Mock).mockResolvedValue([]);
+
+      const progresso = await usuarioService.buscarProgresso(usuario);
+
+      expect(progresso.streakEmRisco).toBe(false);
     });
   });
 });
