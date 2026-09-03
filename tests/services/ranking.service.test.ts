@@ -24,8 +24,9 @@ describe("ranking.service", () => {
       expect.objectContaining({
         where: {
           dataConclusao: {
-            gte: new Date("2026-08-31T00:00:00.000Z"),
-            lte: new Date("2026-09-06T23:59:59.999Z"),
+            // Semana seg–dom no fuso de São Paulo (UTC−3): 31/08 00:00 a 06/09 23:59:59.999 locais.
+            gte: new Date("2026-08-31T03:00:00.000Z"),
+            lte: new Date("2026-09-07T02:59:59.999Z"),
           },
         },
       })
