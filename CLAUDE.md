@@ -8,6 +8,8 @@ API REST para uma aplicação de gerenciamento de rotinas de estudo com IA e gam
 
 Toda a documentação de especificação do TCC (Requisitos, Regras de Negócio, Diagrama de Classes) já está pronta e é fonte da verdade. Não redefina requisitos ou regras de negócio sem perguntar antes.
 
+Documentação do comportamento do backend (para o frontend e para a escrita do TCC): `docs/` — começa em `docs/README.md`. Mantenha em dia ao mudar rotas, regras ou modelo de dados.
+
 ## Stack
 
 - Node.js + TypeScript
