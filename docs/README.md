@@ -12,6 +12,7 @@ e consome esta API.
 
 | Documento | Conteúdo |
 |---|---|
+| [para-o-frontend.md](para-o-frontend.md) | **Estado atual do backend para quem vai desenvolver o frontend** — prontidão por área, como conectar, o que já dá para integrar. |
 | [visao-geral.md](visao-geral.md) | O que o backend faz, de ponta a ponta. Comece por aqui. |
 | [autenticacao.md](autenticacao.md) | Fluxo de token Firebase, `authMiddleware`, criação de usuário no primeiro login. |
 | [referencia-api.md](referencia-api.md) | Contrato completo de cada rota: método, corpo, resposta, erros, exemplos. |
@@ -30,4 +31,4 @@ e consome esta API.
 - **IA:** gera a rotina de estudos via chat (`POST /api/rotinas/chat`) e gera o conteúdo do desafio adaptativo. Limite de 10 chamadas/dia por usuário no fluxo de chat.
 - **Fuso:** todo "dia civil" (streak, limite diário de IA, semana do ranking) é calculado em `America/Sao_Paulo` (UTC−3 fixo).
 - **Formato de erro:** sempre `{ "error": { "message": "...", "code": "..." } }`.
-- **Pendência:** configurar `OPENAI_API_KEY` no `.env` e validar os fluxos de IA de ponta a ponta.
+- **Pendência:** a chave da OpenAI já está no `.env` e autentica, mas a conta está sem saldo — falta crédito para validar os fluxos de IA com o modelo real (o contrato dessas rotas não muda).
