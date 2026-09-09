@@ -1,8 +1,9 @@
 # Primeiro acesso — corrida na criação do Usuario + reconciliação de nome/email
 
 **Origem:** integração com o frontend (etapa 6 — dashboard).
-**Status:** implementado nesta branch (`fix/primeiro-acesso-concorrente`).
-Substitui a proposta em `docs/followup-nome-reconciliacao` (pode fechar aquele PR).
+**Status:** implementado — merge de `fix/primeiro-acesso-concorrente` na `main` (PR #12).
+Inclui a reconciliação de nome/email do token, que antes era só uma proposta
+separada (item 2 abaixo).
 
 ## Problemas observados
 
