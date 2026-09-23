@@ -31,4 +31,4 @@ e consome esta API.
 - **IA:** gera a rotina de estudos via chat (`POST /api/rotinas/chat`) e gera o conteúdo do desafio adaptativo. Limite de 10 chamadas/dia por usuário no fluxo de chat.
 - **Fuso:** todo "dia civil" (streak, limite diário de IA, semana do ranking) é calculado em `America/Sao_Paulo` (UTC−3 fixo).
 - **Formato de erro:** sempre `{ "error": { "message": "...", "code": "..." } }`.
-- **Pendência:** a chave da OpenAI já está no `.env` e autentica, mas a conta está sem saldo — falta crédito para validar os fluxos de IA com o modelo real (o contrato dessas rotas não muda).
+- **Pendência:** nenhuma pendência técnica conhecida. Os dois fluxos de IA (chat de rotina e desafio adaptativo) foram validados com o modelo real e persistência real (23/09/2026). Falta só deploy, se for necessário.

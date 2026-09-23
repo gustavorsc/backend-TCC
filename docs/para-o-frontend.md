@@ -1,12 +1,12 @@
 # Estado do backend — para o desenvolvimento do frontend
 
-_Atualizado em 09/09/2026 · branch `main` · o backend roda em outro repositório e o frontend consome esta API._
+_Atualizado em 23/09/2026 · branch `main` · o backend roda em outro repositório e o frontend consome esta API._
 
 ## Situação em uma frase
 
-O backend está **completo em contrato e regras de negócio** (16 rotas, RN01–RN16).
-Roda localmente. A única pendência é validar os dois fluxos de IA com a conta OpenAI
-tendo saldo — **o contrato dessas rotas não muda por causa disso**.
+O backend está **completo em contrato, regras de negócio e IA** (16 rotas, RN01–RN16).
+Roda localmente. Os dois fluxos de IA já foram validados com o modelo real e com
+persistência real no banco. Só falta deploy, se/quando for necessário.
 
 ## Prontidão por área
 
@@ -18,13 +18,11 @@ tendo saldo — **o contrato dessas rotas não muda por causa disso**.
 | Tarefas — editar, remover, **concluir** (XP/streak/progresso) | ✅ pronto e testado | conclusão é idempotente |
 | Desafios — listar, concluir | ✅ pronto e testado | criação é automática (RN13) |
 | Ranking semanal | ✅ pronto e testado | |
-| `POST /api/rotinas/chat` (gerar rotina com IA) | 🟡 contrato pronto, testado com IA **simulada** | falta rodar com OpenAI real (conta sem crédito) |
-| Desafio adaptativo gerado por IA (RN13) | 🟡 idem | roda em background ao concluir tarefa |
+| `POST /api/rotinas/chat` (gerar rotina com IA) | ✅ pronto e testado com OpenAI real | validado com modelo real + persistência real (23/09) |
+| Desafio adaptativo gerado por IA (RN13) | ✅ pronto e testado com OpenAI real | roda em background ao concluir tarefa |
 | Deploy / URL pública | ❌ ainda não | por enquanto só `localhost` |
 
-**Para o frontend:** dá pra desenvolver contra **todas as rotas agora**. As de IA já
-respondem no formato definido; se o modelo real exigir ajuste de prompt, muda só o
-texto interno do backend, não o formato da resposta.
+**Para o frontend:** dá pra desenvolver contra **todas as rotas agora**, IA incluída.
 
 ## Como conectar
 
@@ -160,10 +158,9 @@ de autenticação do Firebase.
 
 ## Pendências do backend
 
-1. **Adicionar saldo na conta OpenAI** e validar os dois fluxos de IA com o modelo real (chat de rotina + desafio adaptativo). O contrato não muda.
-2. Deploy / URL pública.
+1. Deploy / URL pública (se for necessário — hoje só roda em `localhost`).
 
-Nenhuma pendência bloqueia o início do frontend.
+Nenhuma pendência técnica ou de contrato. Os fluxos de IA já foram validados com o modelo real.
 
 ## Documentação completa
 
