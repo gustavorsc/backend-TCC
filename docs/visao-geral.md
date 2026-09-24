@@ -77,6 +77,7 @@ Uma rotina **pertence a um único usuário** (RN04). Acessar rotina de outro usu
 - **`PUT /:id`** — edita `titulo` / `descricao`.
 - **`DELETE /:id`** — remove a tarefa, **exceto** se for a última da rotina (RN03 → `400 ROTINA_SEM_TAREFA`). Recalcula o progresso.
 - **`PATCH /:id/concluir`** — marca a tarefa como concluída e dispara os efeitos de gamificação:
+  - **RN20:** tarefa gerada pela IA tem uma questão de múltipla escolha (`pergunta`/`opcoes`) — exige `respostaSelecionada` correta no corpo pra concluir; errar não conclui nem penaliza (tentativas ilimitadas). Tarefa criada manualmente não tem questão e conclui direto;
   - concede **+10 XP** (uma única vez — idempotente);
   - atualiza o **streak** (dia civil de São Paulo);
   - recalcula o **progresso** da rotina;
@@ -137,7 +138,7 @@ Erro: **sempre**
 
 | HTTP | Quando | `code` (exemplos) |
 |---|---|---|
-| 400 | Validação de entrada, ou regra de negócio simples | `VALIDACAO`, `ROTINA_SEM_TAREFA` |
+| 400 | Validação de entrada, ou regra de negócio simples | `VALIDACAO`, `ROTINA_SEM_TAREFA`, `RESPOSTA_OBRIGATORIA` |
 | 401 | Token ausente/inválido | `NAO_AUTENTICADO` |
 | 403 | Recurso de outro usuário | `ROTINA_ACESSO_NEGADO`, `TAREFA_ACESSO_NEGADA`, `DESAFIO_ACESSO_NEGADO` |
 | 404 | Recurso inexistente | `ROTINA_NAO_ENCONTRADA`, `TAREFA_NAO_ENCONTRADA`, `DESAFIO_NAO_ENCONTRADO` |

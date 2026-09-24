@@ -35,15 +35,20 @@ describe("ia.service.conversar", () => {
     expect(resultado).toEqual({ tipo: "pergunta", mensagem: "Qual seu nível?" });
   });
 
+  const TAREFA_VALIDA = {
+    titulo: "Limites",
+    descricao: "Resumo de estudo sobre limites de funções.",
+    pergunta: "O que representa o limite de uma função?",
+    opcoes: ["O valor exato em um ponto", "O comportamento perto de um ponto", "A derivada", "A integral"],
+    respostaCorreta: 1,
+  };
+
   it("retorna a rotina quando a IA devolve uma rotina válida", async () => {
     mockCreate.mockResolvedValue(
       respostaOpenAI(
         JSON.stringify({
           tipo: "rotina",
-          rotina: {
-            tema: "Cálculo I",
-            tarefas: [{ titulo: "Limites", descricao: "Estudar limites" }],
-          },
+          rotina: { tema: "Cálculo I", tarefas: [TAREFA_VALIDA] },
         })
       )
     );
@@ -51,11 +56,49 @@ describe("ia.service.conversar", () => {
     const resultado = await iaService.conversar(MENSAGENS);
 
     expect(resultado).toMatchObject({ tipo: "rotina", rotina: { tema: "Cálculo I" } });
+    if (resultado.tipo === "rotina") {
+      expect(resultado.rotina.tarefas[0]).toMatchObject({
+        pergunta: TAREFA_VALIDA.pergunta,
+        respostaCorreta: 1,
+      });
+    }
   });
 
   it("RN10: lança 502 IA_RESPOSTA_INVALIDA quando a rotina vem sem tarefas", async () => {
     mockCreate.mockResolvedValue(
       respostaOpenAI(JSON.stringify({ tipo: "rotina", rotina: { tema: "Cálculo I", tarefas: [] } }))
+    );
+
+    await expect(iaService.conversar(MENSAGENS)).rejects.toMatchObject({
+      statusCode: 502,
+      code: "IA_RESPOSTA_INVALIDA",
+    });
+  });
+
+  it("RN10: lança 502 quando a tarefa vem sem questão de múltipla escolha", async () => {
+    mockCreate.mockResolvedValue(
+      respostaOpenAI(
+        JSON.stringify({
+          tipo: "rotina",
+          rotina: { tema: "Cálculo I", tarefas: [{ titulo: "Limites", descricao: "..." }] },
+        })
+      )
+    );
+
+    await expect(iaService.conversar(MENSAGENS)).rejects.toMatchObject({
+      statusCode: 502,
+      code: "IA_RESPOSTA_INVALIDA",
+    });
+  });
+
+  it("RN10: lança 502 quando respostaCorreta aponta para uma opção inexistente", async () => {
+    mockCreate.mockResolvedValue(
+      respostaOpenAI(
+        JSON.stringify({
+          tipo: "rotina",
+          rotina: { tema: "Cálculo I", tarefas: [{ ...TAREFA_VALIDA, respostaCorreta: 9 }] },
+        })
+      )
     );
 
     await expect(iaService.conversar(MENSAGENS)).rejects.toMatchObject({
