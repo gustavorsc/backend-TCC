@@ -21,6 +21,9 @@ jest.mock("../../src/lib/prisma", () => {
       findFirst: jest.fn(),
       create: jest.fn(),
     },
+    historicoXP: {
+      create: jest.fn(),
+    },
     $transaction: jest.fn((arg: unknown) =>
       Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(client)
     ),
@@ -199,6 +202,7 @@ describe("tarefa.service", () => {
 
       expect(resultado.concluida).toBe(true);
       expect(prisma.usuario.update).not.toHaveBeenCalled();
+      expect(prisma.historicoXP.create).not.toHaveBeenCalled();
       expect(resultado).not.toHaveProperty("rotina");
       expect(resultado).not.toHaveProperty("respostaCorreta");
     });
@@ -235,6 +239,9 @@ describe("tarefa.service", () => {
       expect(prisma.rotina.update).toHaveBeenCalledWith({
         where: { id: ROTINA_ID },
         data: { progresso: 100 },
+      });
+      expect(prisma.historicoXP.create).toHaveBeenCalledWith({
+        data: { usuarioId: USUARIO_ID, xp: XP_POR_TAREFA },
       });
       expect(resultado.xpConcedido).toBe(XP_POR_TAREFA);
       expect(prisma.desafio.create).not.toHaveBeenCalled();
@@ -317,6 +324,7 @@ describe("tarefa.service", () => {
       expect(resultado).toMatchObject({ concluida: false, correta: false });
       expect(prisma.tarefa.update).not.toHaveBeenCalled();
       expect(prisma.usuario.update).not.toHaveBeenCalled();
+      expect(prisma.historicoXP.create).not.toHaveBeenCalled();
       expect(resultado).not.toHaveProperty("respostaCorreta");
     });
 

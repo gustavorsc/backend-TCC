@@ -186,6 +186,10 @@ export async function concluir(
       },
     });
 
+    // RN14 — registro independente do XP, para o ranking semanal sobreviver a
+    // uma exclusão posterior da rotina/tarefa (ver ranking.service.ts).
+    await tx.historicoXP.create({ data: { usuarioId, xp: XP_POR_TAREFA } });
+
     await recalcularProgresso(tarefa.rotinaId, tx);
 
     return {

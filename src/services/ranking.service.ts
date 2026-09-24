@@ -8,29 +8,33 @@ export interface PosicaoRanking {
 }
 
 /**
- * GET /api/ranking (RN14) — soma o xpConcedido das tarefas concluídas na
- * semana corrente (segunda a domingo), agrupado por usuário via
- * Rotina.usuarioId, ordenado do maior para o menor XP.
+ * GET /api/ranking (RN14) — soma o XP registrado em `HistoricoXP` na semana
+ * corrente (segunda a domingo, fuso de São Paulo), agrupado por usuário,
+ * ordenado do maior para o menor.
  *
- * Ranking não é uma tabela própria — é sempre calculado em cima de Tarefa.
+ * Ranking não é uma tabela própria com posições — é sempre recalculado, mas a
+ * partir de `HistoricoXP` (registro permanente gravado junto do XP), não de
+ * `Tarefa`: excluir uma rotina/tarefa depois de concluída não some com a
+ * contribuição dela pro ranking da semana (só `Usuario.xpTotal` era
+ * permanente antes; agora o ranking semanal também é).
  */
 export async function obterRankingSemanal(agora: Date = new Date()): Promise<PosicaoRanking[]> {
   const { inicio, fim } = limitesDaSemanaAtual(agora);
 
-  const tarefasDaSemana = await prisma.tarefa.findMany({
-    where: { dataConclusao: { gte: inicio, lte: fim } },
+  const registrosDaSemana = await prisma.historicoXP.findMany({
+    where: { dataCriacao: { gte: inicio, lte: fim } },
     select: {
-      xpConcedido: true,
-      rotina: { select: { usuario: { select: { id: true, nome: true } } } },
+      xp: true,
+      usuario: { select: { id: true, nome: true } },
     },
   });
 
   const xpPorUsuario = new Map<string, PosicaoRanking>();
 
-  for (const tarefa of tarefasDaSemana) {
-    const { id: usuarioId, nome } = tarefa.rotina.usuario;
+  for (const registro of registrosDaSemana) {
+    const { id: usuarioId, nome } = registro.usuario;
     const posicaoAtual = xpPorUsuario.get(usuarioId) ?? { usuarioId, nome, xpSemana: 0 };
-    posicaoAtual.xpSemana += tarefa.xpConcedido;
+    posicaoAtual.xpSemana += registro.xp;
     xpPorUsuario.set(usuarioId, posicaoAtual);
   }
 

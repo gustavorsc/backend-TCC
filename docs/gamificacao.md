@@ -81,13 +81,14 @@ Rotina sem tarefas → `progresso = 0` (mas RN03 impede esse estado por remoçã
 `GET /api/ranking`:
 
 1. `limitesDaSemanaAtual(agora)` → segunda 00:00 e domingo 23:59:59.999 no fuso de São Paulo, como instantes UTC.
-2. Busca `Tarefa` com `dataConclusao` nesse intervalo.
-3. Soma `xpConcedido` por usuário (via `Rotina.usuario`).
+2. Busca `HistoricoXP` com `dataCriacao` nesse intervalo.
+3. Soma `xp` por usuário.
 4. Ordena do maior para o menor XP da semana.
 
-- Quem não concluiu nada na semana **não aparece**.
+- Quem não pontuou na semana **não aparece**.
 - Zera toda segunda-feira (00:00 São Paulo).
 - Como XP por tarefa é fixo (10), `xpSemana` é sempre múltiplo de 10 = `10 × tarefas concluídas na semana`.
+- **Sobrevive à exclusão de rotina/tarefa:** `HistoricoXP` é gravado quando a tarefa é concluída e nunca é apagado por causa disso — só junto com a conta inteira (`DELETE /api/usuarios/me`). Excluir uma rotina depois de concluída não tira o XP dela do ranking daquela semana (era assim que já funcionava `Usuario.xpTotal`; até 24/09/2026 o ranking semanal era a exceção — calculava direto em cima de `Tarefa`, então "sumia" nesse cenário. Corrigido.).
 
 ## Desafio adaptativo (RN13)
 
