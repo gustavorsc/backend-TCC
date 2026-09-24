@@ -3,11 +3,18 @@ import { AppError } from "../middlewares/errorHandler";
 import prisma from "../lib/prisma";
 import { buscarRotinaDoUsuarioOuFalhar, recalcularProgresso } from "./rotina.service";
 import { processarDesafioAdaptativo } from "./desafio.service";
-import { AtualizarTarefaInput, CriarTarefaInput } from "../schemas/tarefa.schema";
+import {
+  AtualizarTarefaInput,
+  CriarTarefaInput,
+  respostaSelecionadaSchema,
+} from "../schemas/tarefa.schema";
 import { XP_POR_TAREFA } from "../utils/constants";
 import { calcularNovoStreak } from "../utils/streak";
 
-type TarefaComRotina = Tarefa & { rotina: { usuarioId: string; tema: string } };
+/** Tarefa sem `respostaCorreta` — omitida por padrão pelo client (ver lib/prisma.ts). */
+type TarefaSemResposta = Omit<Tarefa, "respostaCorreta">;
+
+type TarefaComRotina = TarefaSemResposta & { rotina: { usuarioId: string; tema: string } };
 
 /**
  * Busca a tarefa pelo id e garante, via a rotina dona dela, que pertence ao
@@ -39,7 +46,7 @@ export async function criar(
   usuarioId: string,
   rotinaId: string,
   dados: CriarTarefaInput
-): Promise<Tarefa> {
+): Promise<TarefaSemResposta> {
   await buscarRotinaDoUsuarioOuFalhar(usuarioId, rotinaId);
 
   const tarefa = await prisma.tarefa.create({
@@ -56,7 +63,7 @@ export async function atualizar(
   usuarioId: string,
   tarefaId: string,
   dados: AtualizarTarefaInput
-): Promise<Tarefa> {
+): Promise<TarefaSemResposta> {
   await buscarTarefaDoUsuarioOuFalhar(usuarioId, tarefaId);
 
   return prisma.tarefa.update({ where: { id: tarefaId }, data: dados });
@@ -83,21 +90,56 @@ export async function excluir(usuarioId: string, tarefaId: string): Promise<void
   await recalcularProgresso(tarefa.rotinaId);
 }
 
+export type TarefaPublica = TarefaSemResposta & { correta?: boolean };
+
 /**
- * PATCH /api/tarefas/:id/concluir (RF08, RN07–RN13). Idempotente: concluir uma
- * tarefa já concluída simplesmente a retorna, sem repetir XP/streak (RN09 — XP
- * só é concedido na conclusão, uma única vez).
+ * Remove `respostaCorreta` (e a relação `rotina`, usada só internamente para
+ * checagem de dono) antes de devolver a tarefa ao cliente. `respostaCorreta`
+ * já não vem por padrão do Prisma (omit global em lib/prisma.ts) — esta função
+ * cobre o único ponto do código que a lê explicitamente (ver concluir abaixo).
+ */
+function paraTarefaPublica(
+  tarefa: Tarefa & { rotina?: { usuarioId: string; tema: string } }
+): TarefaSemResposta {
+  const { respostaCorreta: _respostaCorreta, rotina: _rotina, ...resto } = tarefa;
+  return resto;
+}
+
+/**
+ * PATCH /api/tarefas/:id/concluir (RF08, RN07–RN13, RN20). Idempotente: concluir
+ * uma tarefa já concluída simplesmente a retorna, sem repetir XP/streak (RN09).
+ *
+ * RN20 (nova) — tarefas geradas pela IA trazem uma questão de múltipla escolha
+ * (RN10 garante a estrutura). Concluir exige acertar `respostaSelecionada`
+ * (índice em `opcoes`); errar não penaliza nada — só não conclui, e dá pra
+ * tentar de novo sem limite. Tarefas criadas manualmente (sem `pergunta`)
+ * continuam concluindo direto, sem resposta. `respostaCorreta` nunca é
+ * devolvida ao cliente — é lida aqui só para conferir a resposta enviada.
  *
  * XP, streak e progresso são atualizados numa transação interativa (o streak
  * depende do estado atual do usuário lido dentro da operação). A checagem do
  * desafio adaptativo (RN13) roda DEPOIS do commit, fora da transação, porque
  * envolve uma chamada à OpenAI — ver processarDesafioAdaptativo.
  */
-export async function concluir(usuarioId: string, tarefaId: string): Promise<Tarefa> {
-  const { tarefa, temaParaDesafio } = await prisma.$transaction(async (tx) => {
+export async function concluir(
+  usuarioId: string,
+  tarefaId: string,
+  respostaSelecionadaBruta?: unknown
+): Promise<TarefaPublica> {
+  let respostaSelecionada: number | undefined;
+  if (respostaSelecionadaBruta !== undefined) {
+    const resultado = respostaSelecionadaSchema.safeParse(respostaSelecionadaBruta);
+    if (!resultado.success) {
+      throw new AppError("respostaSelecionada precisa ser um índice válido", 400, "VALIDACAO");
+    }
+    respostaSelecionada = resultado.data;
+  }
+
+  const { tarefa, temaParaDesafio, correta } = await prisma.$transaction(async (tx) => {
     const tarefa = await tx.tarefa.findUnique({
       where: { id: tarefaId },
       include: { rotina: { select: { usuarioId: true, tema: true } } },
+      omit: { respostaCorreta: false }, // precisa do valor real pra conferir a resposta
     });
 
     if (!tarefa) {
@@ -109,7 +151,20 @@ export async function concluir(usuarioId: string, tarefaId: string): Promise<Tar
     }
 
     if (tarefa.concluida) {
-      return { tarefa, temaParaDesafio: null as string | null };
+      return { tarefa, temaParaDesafio: null as string | null, correta: undefined as boolean | undefined };
+    }
+
+    if (tarefa.pergunta) {
+      if (respostaSelecionada === undefined) {
+        throw new AppError(
+          "Selecione uma resposta para concluir esta tarefa",
+          400,
+          "RESPOSTA_OBRIGATORIA"
+        );
+      }
+      if (respostaSelecionada !== tarefa.respostaCorreta) {
+        return { tarefa, temaParaDesafio: null as string | null, correta: false };
+      }
     }
 
     const usuario = await tx.usuario.findUniqueOrThrow({ where: { id: usuarioId } });
@@ -133,12 +188,17 @@ export async function concluir(usuarioId: string, tarefaId: string): Promise<Tar
 
     await recalcularProgresso(tarefa.rotinaId, tx);
 
-    return { tarefa: tarefaConcluida, temaParaDesafio: tarefa.rotina.tema };
+    return {
+      tarefa: tarefaConcluida,
+      temaParaDesafio: tarefa.rotina.tema,
+      correta: tarefa.pergunta ? true : undefined,
+    };
   });
 
   if (temaParaDesafio) {
     await processarDesafioAdaptativo(usuarioId, temaParaDesafio);
   }
 
-  return tarefa;
+  const tarefaPublica = paraTarefaPublica(tarefa);
+  return correta === undefined ? tarefaPublica : { ...tarefaPublica, correta };
 }

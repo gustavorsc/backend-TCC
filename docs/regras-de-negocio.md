@@ -22,6 +22,7 @@ verdade — não redefinir sem alinhamento.
 | **RN15** | Limite de chamadas à IA por usuário/período | **10 por dia civil** (`IA_LIMITE_DIARIO`). `reservarChamadaIA` incrementa `UsoIA` (upsert atômico) e lança `429 LIMITE_IA_DIARIO` **antes** de chamar a OpenAI. Só o fluxo de chat conta; a geração de desafio não. | `services/usoIA.service.ts`, `services/rotina.service.ts` |
 | **RN16** | Notificar risco de quebra de streak | `GET /api/usuarios/me/progresso` devolve `streakEmRisco` (bool): `true` quando `streakAtual > 0` e a última atividade não foi hoje. O frontend decide como notificar. | `services/usuario.service.ts`, `utils/streak.ts` |
 | **RN17–RN19** | Validade / uso único / não revelação de e-mail no reset de senha | Fora do backend — o fluxo de redefinição de senha é 100% do Firebase Authentication. | — |
+| **RN20** (nova) | Tarefa como "card de estudo": conclusão exige acertar uma questão de múltipla escolha | Tarefas geradas pela IA trazem `pergunta`/`opcoes`/`respostaCorreta` (validado pelo RN10). `PATCH /api/tarefas/:id/concluir` exige `respostaSelecionada` correta pra concluir; errar não penaliza, tentativas ilimitadas. Tarefas criadas manualmente (sem pergunta) concluem direto. `respostaCorreta` nunca é exposta (omit global do Prisma). | `services/tarefa.service.ts`, `lib/prisma.ts`, `schemas/chat.schema.ts` |
 
 ## Detalhes que valem para o frontend
 

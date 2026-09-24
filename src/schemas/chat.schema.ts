@@ -33,6 +33,26 @@ export type ChatMensagem = ChatInput["mensagens"][number];
  */
 const campoOpcional = z.string().trim().min(1).nullish();
 
+/**
+ * Cada tarefa gerada pela IA é um "card de estudo": um resumo (`descricao`,
+ * agora obrigatório e substancial — não só um título repetido) e uma questão
+ * de múltipla escolha que verifica o entendimento. `respostaCorreta` é o
+ * índice (0-based) da opção certa em `opcoes` — validado contra o tamanho do
+ * array pra nunca apontar pra uma opção inexistente.
+ */
+const tarefaGeradaSchema = z
+  .object({
+    titulo: z.string().trim().min(1),
+    descricao: z.string().trim().min(1),
+    pergunta: z.string().trim().min(1),
+    opcoes: z.array(z.string().trim().min(1)).min(2).max(6),
+    respostaCorreta: z.number().int().min(0),
+  })
+  .refine((t) => t.respostaCorreta < t.opcoes.length, {
+    message: "respostaCorreta precisa apontar para uma opção existente em opcoes",
+    path: ["respostaCorreta"],
+  });
+
 export const rotinaGeradaSchema = z.object({
   tema: z.string().trim().min(1),
   descricao: campoOpcional,
@@ -40,12 +60,7 @@ export const rotinaGeradaSchema = z.object({
   tempoDisponivel: campoOpcional,
   frequencia: campoOpcional,
   tarefas: z
-    .array(
-      z.object({
-        titulo: z.string().trim().min(1),
-        descricao: campoOpcional,
-      })
-    )
+    .array(tarefaGeradaSchema)
     .min(1, "a rotina precisa ter ao menos uma tarefa")
     .max(50, "rotina com tarefas demais"),
 });

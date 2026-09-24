@@ -74,9 +74,9 @@ Responda SEMPRE e SOMENTE com um objeto JSON válido, sem texto fora do JSON, em
 {"tipo":"pergunta","mensagem":"<sua pergunta ao usuário>"}
 
 2) Quando puder gerar a rotina:
-{"tipo":"rotina","rotina":{"tema":"<tema>","descricao":"<resumo curto>","nivelConhecimento":"<nível>","tempoDisponivel":"<ex: 1h por dia>","frequencia":"<ex: 5x por semana>","tarefas":[{"titulo":"<título>","descricao":"<o que fazer>"}]}}
+{"tipo":"rotina","rotina":{"tema":"<tema>","descricao":"<resumo curto da rotina>","nivelConhecimento":"<nível>","tempoDisponivel":"<ex: 1h por dia>","frequencia":"<ex: 5x por semana>","tarefas":[{"titulo":"<título curto>","descricao":"<resumo de estudo em 2 a 4 frases, com conteúdo de verdade — não repita o título>","pergunta":"<pergunta de múltipla escolha sobre o conteúdo dessa tarefa>","opcoes":["<opção 1>","<opção 2>","<opção 3>","<opção 4>"],"respostaCorreta":<índice 0-based da opção certa em "opcoes">}]}}
 
-A rotina deve ter entre 1 e 50 tarefas, concretas e na ordem de execução. Não invente dados que o usuário não deu: se algo essencial faltar, pergunte.`;
+A rotina deve ter entre 1 e 50 tarefas, concretas e na ordem de execução. Cada tarefa é um card de estudo: "descricao" ensina o conteúdo (o suficiente para responder a pergunta), e "pergunta" com 3 a 5 "opcoes" verifica se a pessoa entendeu — só uma opção certa; aponte o índice dela em "respostaCorreta" (0 = primeira opção). Não invente dados que o usuário não deu: se algo essencial faltar, pergunte.`;
 
 /**
  * RF03/RF12 — envia a conversa para a OpenAI e devolve a resposta já validada

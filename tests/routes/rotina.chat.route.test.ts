@@ -105,6 +105,13 @@ describe("POST /api/rotinas/chat", () => {
   });
 
   it("RF03/RN03: persiste a rotina gerada com as tarefas e retorna 201", async () => {
+    const TAREFA_GERADA = {
+      titulo: "Limites",
+      descricao: "Resumo de estudo sobre limites de funções.",
+      pergunta: "O que representa o limite de uma função?",
+      opcoes: ["Valor exato", "Comportamento perto de um ponto", "Derivada", "Integral"],
+      respostaCorreta: 1,
+    };
     mockCreateCompletion.mockResolvedValue(
       completion(
         JSON.stringify({
@@ -112,10 +119,7 @@ describe("POST /api/rotinas/chat", () => {
           rotina: {
             tema: "Cálculo I",
             descricao: "Rotina inicial",
-            tarefas: [
-              { titulo: "Limites", descricao: "Estudar limites" },
-              { titulo: "Derivadas", descricao: null },
-            ],
+            tarefas: [TAREFA_GERADA],
           },
         })
       )
@@ -124,7 +128,7 @@ describe("POST /api/rotinas/chat", () => {
       id: "rotina-1",
       usuarioId: USUARIO.id,
       tema: "Cálculo I",
-      tarefas: [{ id: "t1", titulo: "Limites" }],
+      tarefas: [{ id: "t1", titulo: "Limites", pergunta: TAREFA_GERADA.pergunta }],
     });
 
     const response = await request(app)
@@ -135,17 +139,14 @@ describe("POST /api/rotinas/chat", () => {
     expect(response.status).toBe(201);
     expect(response.body.tipo).toBe("rotina");
     expect(response.body.rotina.id).toBe("rotina-1");
+    // A rotina devolvida ao frontend nunca traz a resposta certa (RN20).
+    expect(response.body.rotina.tarefas[0]).not.toHaveProperty("respostaCorreta");
     expect(prisma.rotina.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           usuarioId: USUARIO.id,
           tema: "Cálculo I",
-          tarefas: {
-            create: [
-              { titulo: "Limites", descricao: "Estudar limites" },
-              { titulo: "Derivadas", descricao: null },
-            ],
-          },
+          tarefas: { create: [TAREFA_GERADA] },
         }),
       })
     );
