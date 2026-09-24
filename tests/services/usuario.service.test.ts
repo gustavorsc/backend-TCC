@@ -7,6 +7,7 @@ jest.mock("../../src/lib/prisma", () => ({
     rotina: { deleteMany: jest.fn(), findMany: jest.fn() },
     desafio: { deleteMany: jest.fn() },
     usoIA: { deleteMany: jest.fn() },
+    historicoXP: { deleteMany: jest.fn() },
     usuario: { delete: jest.fn() },
     $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
   },
@@ -63,6 +64,7 @@ describe("usuario.service", () => {
       expect(prisma.rotina.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: usuario.id } });
       expect(prisma.desafio.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: usuario.id } });
       expect(prisma.usoIA.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: usuario.id } });
+      expect(prisma.historicoXP.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: usuario.id } });
       expect(prisma.usuario.delete).toHaveBeenCalledWith({ where: { id: usuario.id } });
       expect(mockDeleteUser).toHaveBeenCalledWith(usuario.firebaseUid);
     });

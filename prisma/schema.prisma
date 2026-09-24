@@ -23,6 +23,7 @@ model Usuario {
   rotinas         Rotina[]
   desafios        Desafio[]
   usosIA          UsoIA[]
+  historicoXP     HistoricoXP[]
 }
 
 model Rotina {
@@ -71,6 +72,22 @@ model Desafio {
   dataCriacao DateTime @default(now())
 
   usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+}
+
+// RN14 — registro independente de XP, gravado no mesmo instante em que
+// Usuario.xpTotal é incrementado (tarefa.service.concluir). O ranking semanal
+// soma daqui, não de Tarefa — assim deletar uma rotina/tarefa depois de
+// concluída não apaga a contribuição dela pro ranking (xpTotal já era
+// permanente; isso torna o ranking semanal permanente também).
+model HistoricoXP {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  xp          Int
+  dataCriacao DateTime @default(now())
+
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataCriacao])
 }
 
 // RN15 — contador de chamadas à IA por usuário e por dia civil (UTC).
