@@ -1,4 +1,4 @@
-import { Prisma, Rotina, Tarefa } from "@prisma/client";
+import { Prisma, Rotina } from "@prisma/client";
 import { AppError } from "../middlewares/errorHandler";
 import prisma from "../lib/prisma";
 import { AtualizarRotinaInput } from "../schemas/rotina.schema";
@@ -67,10 +67,7 @@ function persistirRotinaGerada(usuarioId: string, dados: RotinaGerada) {
       tarefas: {
         create: dados.tarefas.map((t) => ({
           titulo: t.titulo,
-          descricao: t.descricao,
-          pergunta: t.pergunta,
-          opcoes: t.opcoes,
-          respostaCorreta: t.respostaCorreta,
+          descricao: t.descricao ?? null,
         })),
       },
     },
@@ -78,14 +75,11 @@ function persistirRotinaGerada(usuarioId: string, dados: RotinaGerada) {
   });
 }
 
-/** Tarefa sem `respostaCorreta` — omitida por padrão pelo client (ver lib/prisma.ts). */
-type TarefaSemResposta = Omit<Tarefa, "respostaCorreta">;
-
 type RespostaChat =
   | { tipo: "pergunta"; mensagem: string; chamadasRestantes: number }
   | {
       tipo: "rotina";
-      rotina: Rotina & { tarefas: TarefaSemResposta[] };
+      rotina: Prisma.RotinaGetPayload<{ include: { tarefas: true } }>;
       chamadasRestantes: number;
     };
 

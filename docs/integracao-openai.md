@@ -83,31 +83,22 @@ Rotina pronta:
     "tempoDisponivel": "string | null | ausente",
     "frequencia": "string | null | ausente",
     "tarefas": [
-      {
-        "titulo": "string (obrigatório)",
-        "descricao": "string (obrigatório) — resumo de estudo em 2-4 frases, não o título repetido",
-        "pergunta": "string (obrigatório) — questão de múltipla escolha sobre o conteúdo da tarefa",
-        "opcoes": ["string", "... (2 a 6 opções)"],
-        "respostaCorreta": "número (obrigatório) — índice 0-based da opção certa em opcoes"
-      }
+      { "titulo": "string (obrigatório)", "descricao": "string | null | ausente" }
     ]
   }
 }
 ```
 
-Validação (RN10 / RN03 / RN20):
+Validação (RN10 / RN03):
 
 - `tipo` tem que ser exatamente `"pergunta"` ou `"rotina"`.
-- Em `rotina`: `tema` não vazio; `tarefas` entre **1 e 50** itens.
-- Em cada tarefa: `titulo` e `descricao` não vazios; `pergunta` não vazia; `opcoes` com 2 a 6 itens não vazios; `respostaCorreta` precisa ser um índice válido dentro de `opcoes` (senão falha a validação mesmo que o resto esteja certo).
+- Em `rotina`: `tema` não vazio; `tarefas` entre **1 e 50** itens; cada `titulo` não vazio.
 - Qualquer desvio → `502 IA_RESPOSTA_INVALIDA` e nada é persistido.
 
 ### Persistência da rotina
 
 Feita numa única operação (`prisma.rotina.create` com `tarefas.create` aninhado).
-`progresso` começa em 0. A rotina volta na resposta já com `id` e `tarefas` — **sem**
-`respostaCorreta` (RN20): o client Prisma omite esse campo por padrão em toda consulta
-(`omit` global em `lib/prisma.ts`), então nem essa resposta nem nenhum `GET` a expõem.
+`progresso` começa em 0. A rotina volta na resposta já com `id` e `tarefas`.
 
 ---
 

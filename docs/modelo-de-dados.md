@@ -59,9 +59,6 @@ Usuario ──1:N──► Rotina ──1:N──► Tarefa
 | `dataCriacao` | `DateTime` = now() | usada na condição do desafio adaptativo (RN13) |
 | `dataConclusao` | `DateTime?` | preenchida ao concluir; usada no ranking (RN14) |
 | `xpConcedido` | `Int` = 0 | vira 10 ao concluir (RN09, RN11) |
-| `pergunta` | `String?` | questão de múltipla escolha gerada pela IA (RN20); `null` em tarefas criadas manualmente |
-| `opcoes` | `String[]` = `[]` | alternativas da questão |
-| `respostaCorreta` | `Int?` | índice (0-based) da opção certa em `opcoes`. **Nunca sai em nenhuma resposta da API** — `omit` global no client Prisma (`lib/prisma.ts`); só `tarefa.service.concluir` a lê, explicitamente, pra conferir a resposta enviada |
 
 ### Desafio
 

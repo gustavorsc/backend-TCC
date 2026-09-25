@@ -1,32 +1,13 @@
 # Gamificação
 
-XP, streak, progresso, ranking, desafio adaptativo e a questão de múltipla escolha
-que guarda a entrada da conclusão. Todos os cálculos de "dia" e "semana" usam o
-fuso **America/Sao_Paulo** (UTC−3 fixo).
-
-## Tarefa como card de estudo (RN20)
-
-Tarefas geradas pela IA (chat de rotina) não são um checkbox simples — vêm com:
-
-- **`descricao`**: resumo de estudo de verdade (2-4 frases), não um título repetido.
-- **`pergunta` + `opcoes`**: uma questão de múltipla escolha sobre o conteúdo da tarefa.
-
-Concluir (`PATCH /api/tarefas/:id/concluir`) exige acertar a questão quando ela existe:
-resposta errada não conclui e **não penaliza** (sem limite de tentativas, sem perda de
-XP/streak); resposta certa conclui normalmente. Tarefas criadas manualmente pelo
-usuário (`POST /rotinas/:id/tarefas`) não têm questão — concluem direto, como antes.
-
-A resposta certa (`respostaCorreta`) **nunca aparece em nenhuma resposta da API**
-(nem na rotina recém-gerada, nem no `GET`, nem numa tentativa errada) — é lida
-internamente só na hora de conferir. Ver [modelo-de-dados.md](modelo-de-dados.md#tarefa)
-e [regras-de-negocio.md](regras-de-negocio.md).
+XP, streak, progresso, ranking e desafio adaptativo. Todos os cálculos de "dia" e
+"semana" usam o fuso **America/Sao_Paulo** (UTC−3 fixo).
 
 ## XP (RN09, RN11)
 
 - **+10 XP** por tarefa concluída (`XP_POR_TAREFA` em `utils/constants.ts`).
 - Concedido **uma única vez**, no momento da conclusão, dentro da transação de `PATCH /api/tarefas/:id/concluir`.
 - Concluir uma tarefa já concluída é **idempotente**: retorna a tarefa sem somar XP de novo.
-- Tentar concluir com a resposta errada **não é** uma conclusão — não passa pela transação de XP, só devolve `correta: false`.
 - `Tarefa.xpConcedido` guarda quanto aquela tarefa rendeu (fica 10 após concluída). `Usuario.xpTotal` acumula.
 
 ## Streak (RN12)

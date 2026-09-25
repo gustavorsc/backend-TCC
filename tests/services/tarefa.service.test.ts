@@ -71,20 +71,8 @@ function tarefaFixture(overrides: Partial<Tarefa> = {}): Tarefa {
     dataCriacao: new Date("2026-08-01T00:00:00Z"),
     dataConclusao: null,
     xpConcedido: 0,
-    pergunta: null,
-    opcoes: [],
-    respostaCorreta: null,
     ...overrides,
   };
-}
-
-function tarefaComQuestaoFixture(overrides: Partial<Tarefa> = {}): Tarefa {
-  return tarefaFixture({
-    pergunta: "Quanto é 2 + 2?",
-    opcoes: ["3", "4", "5"],
-    respostaCorreta: 1,
-    ...overrides,
-  });
 }
 
 function usuarioFixture(overrides: Partial<Usuario> = {}): Usuario {
