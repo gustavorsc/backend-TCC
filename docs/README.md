@@ -27,8 +27,7 @@ e consome esta API.
 - **Stack:** Node.js + TypeScript + Express + Prisma + PostgreSQL (Supabase) + Firebase Admin SDK + OpenAI + Zod + Jest.
 - **Autenticação:** o backend **não faz login** — só verifica tokens que o frontend obtém do Firebase.
 - **16 rotas** sob `/api` (todas autenticadas) + `GET /health` (aberta).
-- **Regras de negócio RN01–RN16 + RN20** implementadas; RN17–RN19 são do Firebase.
-- **RN20 (nova):** tarefas geradas pela IA são um card de estudo — resumo + questão de múltipla escolha. Concluir exige acertar a questão (sem penalidade em errar).
+- **Regras de negócio RN01–RN16** implementadas; RN17–RN19 são do Firebase.
 - **IA:** gera a rotina de estudos via chat (`POST /api/rotinas/chat`) e gera o conteúdo do desafio adaptativo. Limite de 10 chamadas/dia por usuário no fluxo de chat.
 - **Fuso:** todo "dia civil" (streak, limite diário de IA, semana do ranking) é calculado em `America/Sao_Paulo` (UTC−3 fixo).
 - **Formato de erro:** sempre `{ "error": { "message": "...", "code": "..." } }`.

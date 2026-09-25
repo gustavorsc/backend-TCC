@@ -1,6 +1,5 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["omitApi"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -41,25 +40,16 @@ model Rotina {
 }
 
 model Tarefa {
-  id              String    @id @default(uuid())
-  rotinaId        String
-  titulo          String
-  descricao       String?
-  concluida       Boolean   @default(false)
-  dataCriacao     DateTime  @default(now())
-  dataConclusao   DateTime?
-  xpConcedido     Int       @default(0)
+  id            String    @id @default(uuid())
+  rotinaId      String
+  titulo        String
+  descricao     String?
+  concluida     Boolean   @default(false)
+  dataCriacao   DateTime  @default(now())
+  dataConclusao DateTime?
+  xpConcedido   Int       @default(0)
 
-  // Questão de múltipla escolha gerada pela IA junto da tarefa (chat de rotina).
-  // Tarefas criadas manualmente (POST /rotinas/:id/tarefas) não têm questão —
-  // `pergunta` fica null e a conclusão continua sendo um clique direto.
-  pergunta        String?
-  opcoes          String[] @default([])
-  // Índice (0-based) da opção correta em `opcoes`. Nunca exposto ao frontend
-  // fora da checagem interna — ver omit global em lib/prisma.ts.
-  respostaCorreta Int?
-
-  rotina          Rotina    @relation(fields: [rotinaId], references: [id])
+  rotina        Rotina    @relation(fields: [rotinaId], references: [id])
 }
 
 model Desafio {

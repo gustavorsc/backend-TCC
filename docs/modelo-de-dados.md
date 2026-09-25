@@ -57,9 +57,6 @@ Usuario ──1:N──► Rotina ──1:N──► Tarefa
 | `dataCriacao` | `DateTime` = now() | usada na condição do desafio adaptativo (RN13) |
 | `dataConclusao` | `DateTime?` | preenchida ao concluir; usada no ranking (RN14) |
 | `xpConcedido` | `Int` = 0 | vira 10 ao concluir (RN09, RN11) |
-| `pergunta` | `String?` | questão de múltipla escolha gerada pela IA (RN20); `null` em tarefas criadas manualmente |
-| `opcoes` | `String[]` = `[]` | alternativas da questão |
-| `respostaCorreta` | `Int?` | índice (0-based) da opção certa em `opcoes`. **Nunca sai em nenhuma resposta da API** — `omit` global no client Prisma (`lib/prisma.ts`); só `tarefa.service.concluir` a lê, explicitamente, pra conferir a resposta enviada |
 
 ### Desafio
 
@@ -111,7 +108,6 @@ Em `prisma/migrations/`, aplicadas na Supabase:
 | `20260902181806_init` | `Usuario`, `Rotina`, `Tarefa`, `Desafio` |
 | `20260902183752_add_tarefa_data_criacao` | `Tarefa.dataCriacao` (base da condição do desafio adaptativo) |
 | `20260903182503_add_uso_ia` | tabela `UsoIA` + relação em `Usuario` |
-| `20260924174624_add_tarefa_questao` | `Tarefa.pergunta`/`opcoes`/`respostaCorreta` (RN20) |
 
 Fluxo: editar `schema.prisma` → `npx prisma migrate dev --name <nome>` (usa `DIRECT_URL`).
 Ao mudar o schema, atualizar também a seção de modelo de dados do `../CLAUDE.md`.

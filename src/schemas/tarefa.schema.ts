@@ -23,11 +23,3 @@ export const atualizarTarefaSchema = z
   });
 
 export type AtualizarTarefaInput = z.infer<typeof atualizarTarefaSchema>;
-
-/**
- * PATCH /api/tarefas/:id/concluir — valida o formato de `respostaSelecionada`
- * quando enviado. Não usa `validateBody` (o corpo inteiro é opcional: tarefas
- * sem pergunta concluem sem corpo nenhum) — é parseado direto no service, que
- * também decide se a resposta é obrigatória para aquela tarefa específica.
- */
-export const respostaSelecionadaSchema = z.number().int().min(0);

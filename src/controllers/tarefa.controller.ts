@@ -30,12 +30,7 @@ export async function excluir(req: Request, res: Response, next: NextFunction) {
 
 export async function concluir(req: Request, res: Response, next: NextFunction) {
   try {
-    // Corpo é opcional: só é exigido quando a tarefa tem questão (checado no service).
-    const tarefa = await tarefaService.concluir(
-      req.usuario!.id,
-      req.params.id,
-      req.body?.respostaSelecionada
-    );
+    const tarefa = await tarefaService.concluir(req.usuario!.id, req.params.id);
     res.status(200).json(tarefa);
   } catch (err) {
     next(err);

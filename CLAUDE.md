@@ -85,22 +85,16 @@ model Rotina {
 }
 
 model Tarefa {
-  id              String    @id @default(uuid())
-  rotinaId        String
-  titulo          String
-  descricao       String?
-  concluida       Boolean   @default(false)
-  dataCriacao     DateTime  @default(now())
-  dataConclusao   DateTime?
-  xpConcedido     Int       @default(0)
+  id            String    @id @default(uuid())
+  rotinaId      String
+  titulo        String
+  descricao     String?
+  concluida     Boolean   @default(false)
+  dataCriacao   DateTime  @default(now())
+  dataConclusao DateTime?
+  xpConcedido   Int       @default(0)
 
-  // Questão de múltipla escolha gerada pela IA junto da tarefa (RN20). Tarefas
-  // criadas manualmente não têm questão — pergunta fica null.
-  pergunta        String?
-  opcoes          String[] @default([])
-  respostaCorreta Int?     // índice em opcoes — NUNCA exposto ao cliente (omit global, ver lib/prisma.ts)
-
-  rotina          Rotina    @relation(fields: [rotinaId], references: [id])
+  rotina        Rotina    @relation(fields: [rotinaId], references: [id])
 }
 
 model Desafio {
@@ -159,7 +153,7 @@ Mantenha esta seção atualizada conforme as rotas forem implementadas — é a 
 | POST | `/api/rotinas/:id/tarefas` | Adiciona tarefa à rotina | RF07, RN03 |
 | PUT | `/api/tarefas/:id` | Edita tarefa | RF07 |
 | DELETE | `/api/tarefas/:id` | Remove tarefa | RF07, RN03 (não deixar rotina sem tarefa) |
-| PATCH | `/api/tarefas/:id/concluir` | Conclui tarefa: dispara XP, progresso, streak, checagem de desafio adaptativo. Body opcional `{ respostaSelecionada? }` — obrigatório e conferido quando a tarefa tem `pergunta` (RN20); errar devolve `{ concluida:false, correta:false }` sem penalidade, `400 RESPOSTA_OBRIGATORIA` se faltar | RF08, RN07–RN13, RN20 |
+| PATCH | `/api/tarefas/:id/concluir` | Conclui tarefa: dispara XP, progresso, streak, checagem de desafio adaptativo | RF08, RN07–RN13 |
 | GET | `/api/desafios` | Lista desafios do usuário | RN13 |
 | PATCH | `/api/desafios/:id/concluir` | Marca desafio como concluído | RN13 |
 
@@ -173,7 +167,7 @@ Nunca vazar stack trace ou detalhes internos na resposta. Códigos HTTP: `400` v
 
 ## Regras de negócio — respeitar sempre
 
-RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) — **o conteúdo do desafio é gerado pela IA** (`ia.service.gerarDesafioAdaptativo`, validado por Zod, RN10); a checagem roda como efeito colateral best-effort de concluir tarefa, **fora da transação** (`desafio.service.processarDesafioAdaptativo`), e **não conta no limite da RN15** · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak — backend expõe `streakEmRisco` (bool) em `GET /api/usuarios/me/progresso`; `true` quando `streakAtual > 0` e a última atividade não foi hoje (`utils/streak.streakEmRisco`) · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui. RN20 (nova) — tarefas geradas pela IA trazem uma questão de múltipla escolha (`Tarefa.pergunta`/`opcoes`/`respostaCorreta`, gerada junto no chat, validada pelo RN10); `PATCH /api/tarefas/:id/concluir` exige acertar `respostaSelecionada` pra concluir — errar não penaliza, tentativas ilimitadas. Tarefas criadas manualmente (`POST /rotinas/:id/tarefas`) não têm questão e concluem direto, como antes. `respostaCorreta` nunca é exposta ao cliente (`omit` global do Prisma em `lib/prisma.ts`).
+RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) — **o conteúdo do desafio é gerado pela IA** (`ia.service.gerarDesafioAdaptativo`, validado por Zod, RN10); a checagem roda como efeito colateral best-effort de concluir tarefa, **fora da transação** (`desafio.service.processarDesafioAdaptativo`), e **não conta no limite da RN15** · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak — backend expõe `streakEmRisco` (bool) em `GET /api/usuarios/me/progresso`; `true` quando `streakAtual > 0` e a última atividade não foi hoje (`utils/streak.streakEmRisco`) · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui.
 
 **Dia civil / fuso:** todo cálculo de "dia civil" e de semana (streak RN12, contador diário RN15, semana do ranking RN14) usa o fuso **America/Sao_Paulo** (UTC−3 fixo — Brasil sem horário de verão), centralizado em `utils/tempo.ts` (`diaCivil`, `diferencaEmDiasCivis`, `limitesDaSemanaAtual`).
 
@@ -181,7 +175,7 @@ RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre 
 
 Duas chamadas à IA, ambas em `services/ia.service.ts` (helper comum `pedirJSON`: chama a OpenAI pedindo JSON, faz `JSON.parse`, valida com um schema Zod):
 
-1. **Chat de rotina** — `POST /api/rotinas/chat`, orquestrado em `services/rotina.service.ts` (`processarChat`); limite RN15 em `services/usoIA.service.ts`. Cada tarefa gerada já vem com resumo de estudo (`descricao`) e uma questão de múltipla escolha (`pergunta`/`opcoes`/`respostaCorreta`, RN20).
+1. **Chat de rotina** — `POST /api/rotinas/chat`, orquestrado em `services/rotina.service.ts` (`processarChat`); limite RN15 em `services/usoIA.service.ts`.
 2. **Desafio adaptativo (RN13)** — `gerarDesafioAdaptativo`, chamado por `desafio.service.processarDesafioAdaptativo` como efeito colateral best-effort de concluir tarefa. **Não passa pelo limite da RN15.**
 
 Modelo em `OPENAI_MODEL` (default `gpt-4o-mini`).

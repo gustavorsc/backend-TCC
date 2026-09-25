@@ -1,18 +1,12 @@
 # Estado do backend — para o desenvolvimento do frontend
 
-_Atualizado em 24/09/2026 · branch `main` · o backend roda em outro repositório e o frontend consome esta API._
-
-> **Mudança de contrato nesta atualização (RN20):** tarefas geradas pela IA agora vêm
-> com `pergunta`/`opcoes`, e `PATCH /api/tarefas/:id/concluir` passa a esperar
-> `{ respostaSelecionada }` no corpo para essas tarefas. Ver a seção
-> [O fluxo de conclusão de tarefa](#o-fluxo-de-conclusão-de-tarefa-rn20) abaixo — é a parte que muda a tela de rotina que você já tem rodando.
+_Atualizado em 23/09/2026 · branch `main` · o backend roda em outro repositório e o frontend consome esta API._
 
 ## Situação em uma frase
 
-O backend está **completo em contrato, regras de negócio e IA** (16 rotas, RN01–RN16 + RN20).
+O backend está **completo em contrato, regras de negócio e IA** (16 rotas, RN01–RN16).
 Roda localmente. Os dois fluxos de IA já foram validados com o modelo real e com
-persistência real no banco, incluindo o novo card de estudo com questão (RN20).
-Só falta deploy, se/quando for necessário.
+persistência real no banco. Só falta deploy, se/quando for necessário.
 
 ## Prontidão por área
 
@@ -21,7 +15,7 @@ Só falta deploy, se/quando for necessário.
 | Autenticação (token Firebase) | ✅ pronto | backend só **verifica** o token; login/cadastro/reset são do frontend + Firebase |
 | Usuário (`/me`, `/me/progresso`, excluir conta) | ✅ pronto e testado | `streakEmRisco` incluído (RN16) |
 | Rotinas — CRUD (`GET`/`PUT`/`DELETE`, adicionar tarefa) | ✅ pronto e testado | |
-| Tarefas — editar, remover, **concluir** (XP/streak/progresso) | ✅ pronto e testado | conclusão é idempotente; exige questão certa quando a tarefa tem `pergunta` (RN20) |
+| Tarefas — editar, remover, **concluir** (XP/streak/progresso) | ✅ pronto e testado | conclusão é idempotente |
 | Desafios — listar, concluir | ✅ pronto e testado | criação é automática (RN13) |
 | Ranking semanal | ✅ pronto e testado | |
 | `POST /api/rotinas/chat` (gerar rotina com IA) | ✅ pronto e testado com OpenAI real | validado com modelo real + persistência real (23/09) |
@@ -91,7 +85,7 @@ Contrato completo, com todos os campos e exemplos: [`referencia-api.md`](referen
 | `POST` | `/api/rotinas/:id/tarefas` | adiciona tarefa → `201` |
 | `PUT` | `/api/tarefas/:id` | edita `titulo, descricao` |
 | `DELETE` | `/api/tarefas/:id` | remove tarefa (não a última da rotina) → `204` |
-| `PATCH` | `/api/tarefas/:id/concluir` | conclui: +10 XP, streak, progresso, checa desafio. Corpo `{ respostaSelecionada? }` — obrigatório quando a tarefa tem `pergunta` (RN20) |
+| `PATCH` | `/api/tarefas/:id/concluir` | conclui: +10 XP, streak, progresso, checa desafio |
 | `GET` | `/api/desafios` | desafios do usuário |
 | `PATCH` | `/api/desafios/:id/concluir` | marca desafio como concluído |
 
@@ -112,58 +106,16 @@ Regras: 1–40 mensagens, `content` de 1–2000 chars, a última tem que ser `ro
 
 **Resposta `201` — rotina gerada e já salva:**
 ```json
-{
-  "tipo": "rotina",
-  "rotina": {
-    "id": "...", "tema": "...",
-    "tarefas": [
-      {
-        "id": "...",
-        "titulo": "Introdução à tabuada do 2",
-        "descricao": "A tabuada do 2 é a multiplicação de um número por 2. Ex: 2x1=2, 2x2=4...",
-        "pergunta": "Qual é o resultado de 2 x 3?",
-        "opcoes": ["5", "6", "7", "8"],
-        "concluida": false, "xpConcedido": 0
-      }
-    ]
-  },
-  "chamadasRestantes": 6
-}
+{ "tipo": "rotina", "rotina": { "id": "...", "tema": "...", "tarefas": [ ... ], ... }, "chamadasRestantes": 6 }
 ```
 
 - A rotina retornada **já está persistida** — não há passo de "confirmar". `GET /api/rotinas` já a lista.
 - `chamadasRestantes` = quantas chamadas de IA restam **hoje** (limite de 10/dia por usuário). Ao chegar a 0, a próxima retorna `429 LIMITE_IA_DIARIO`.
-- Cada tarefa vem com `descricao` (resumo de estudo de verdade) + `pergunta`/`opcoes` (múltipla escolha) — **não** vem a resposta certa. Ver seção abaixo.
-
-### O fluxo de conclusão de tarefa (RN20)
-
-Tarefa gerada pela IA tem `pergunta` preenchida → a tela de "concluir" precisa virar
-um card de pergunta (como na sua screenshot: mostrar o resumo, depois `opcoes` como
-alternativas clicáveis) em vez de um clique direto. Tarefa sem `pergunta` (criada à
-mão pelo usuário) continua sendo um clique simples.
-
-```
-PATCH /api/tarefas/:id/concluir
-{ "respostaSelecionada": 1 }   // índice da opção escolhida em "opcoes", 0-based
-```
-
-| Situação | Resposta |
-|---|---|
-| Tarefa sem `pergunta` | corpo é ignorado, conclui direto (`200`, `concluida: true`) — igual ao fluxo antigo |
-| Tarefa com `pergunta`, sem enviar `respostaSelecionada` | `400 RESPOSTA_OBRIGATORIA` |
-| Tarefa com `pergunta`, resposta **errada** | `200 { "concluida": false, "correta": false, ... }` — **sem** XP, **sem** penalidade. Deixe o usuário tentar de novo (sem limite) |
-| Tarefa com `pergunta`, resposta **certa** | `200 { "concluida": true, "correta": true, "xpConcedido": 10, ... }` |
-
-`respostaCorreta` **nunca** aparece em nenhuma resposta da API (nem na geração, nem no
-`GET`, nem numa tentativa errada) — o frontend não tem como "descobrir" a resposta
-antes de acertar. Se quiser mostrar feedback de erro, use o `correta: false` da própria
-resposta, não tente comparar client-side.
 
 ## Comportamentos que o frontend precisa saber
 
 | Comportamento | Detalhe |
 |---|---|
-| **Tarefa vira quiz (RN20)** | tarefa com `pergunta` só conclui acertando `respostaSelecionada`. Sem limite de tentativas, sem penalidade em errar. |
 | **Confirmação de exclusão (RN06)** | o backend **não** confirma nada — se `DELETE` for chamado, ele apaga. A tela de "tem certeza?" é responsabilidade do frontend. |
 | **Aviso de streak (RN16)** | `GET /api/usuarios/me/progresso` traz `streakEmRisco: true/false`. `true` = tem streak ativo e nenhuma tarefa concluída hoje. O frontend decide como/quando notificar. |
 | **Limite de IA (RN15)** | toda resposta do chat traz `chamadasRestantes`. Mostrar ao usuário e tratar o `429`. Reseta na virada do dia (horário de Brasília). |
@@ -179,7 +131,6 @@ resposta, não tente comparar client-side.
 |---|---|---|
 | 400 | `VALIDACAO` | corpo inválido |
 | 400 | `ROTINA_SEM_TAREFA` | tentou remover a última tarefa da rotina |
-| 400 | `RESPOSTA_OBRIGATORIA` | tarefa tem pergunta e o `respostaSelecionada` não veio no corpo (RN20) |
 | 401 | `NAO_AUTENTICADO` | token ausente/inválido/expirado → renovar token ou mandar pro login |
 | 403 | `ROTINA_ACESSO_NEGADO` / `TAREFA_ACESSO_NEGADA` / `DESAFIO_ACESSO_NEGADO` | recurso de outro usuário |
 | 404 | `ROTINA_NAO_ENCONTRADA` / `TAREFA_NAO_ENCONTRADA` / `DESAFIO_NAO_ENCONTRADO` | id inexistente |

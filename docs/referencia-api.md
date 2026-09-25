@@ -141,13 +141,11 @@ Regras do corpo (`chatSchema`):
         "id": "tar-40",
         "rotinaId": "rot-9",
         "titulo": "Revisar funções e gráficos",
-        "descricao": "Resumo de estudo em 2-4 frases, com conteúdo de verdade — não é só o título repetido.",
+        "descricao": "Assistir aula X e resolver a lista 1",
         "concluida": false,
         "dataCriacao": "2026-09-08T13:00:00.000Z",
         "dataConclusao": null,
-        "xpConcedido": 0,
-        "pergunta": "Qual das opções abaixo é uma função crescente?",
-        "opcoes": ["y = -x", "y = x²  (x<0)", "y = x", "y = -x²"]
+        "xpConcedido": 0
       }
     ]
   },
@@ -158,7 +156,6 @@ Regras do corpo (`chatSchema`):
 - `chamadasRestantes`: quantas chamadas à IA ainda restam **hoje** para esse usuário (limite `IA_LIMITE_DIARIO = 10`, RN15). Vai de 9 a 0.
 - Quando `tipo: "rotina"`, a rotina **já está salva** — não há passo de confirmação. `GET /api/rotinas` passa a listá-la.
 - A rotina gerada sempre tem ≥ 1 tarefa (RN03, garantido na validação).
-- **RN20 — cada tarefa é um card de estudo:** `descricao` é um resumo de verdade (não repete o título) e vem sempre com `pergunta` + `opcoes` (múltipla escolha). **A resposta certa nunca aparece em nenhuma resposta da API** — nem aqui, nem em `GET /api/rotinas/:id`. Ver `PATCH /api/tarefas/:id/concluir`.
 
 **Erros específicos**
 
@@ -274,19 +271,13 @@ Objeto `Tarefa`:
   "id": "tar-40",
   "rotinaId": "rot-9",
   "titulo": "Revisar funções",
-  "descricao": "Resumo de estudo — o suficiente para responder a pergunta abaixo.",
+  "descricao": "Aula X + lista 1",
   "concluida": false,
   "dataCriacao": "2026-09-08T13:00:00.000Z",
   "dataConclusao": null,
-  "xpConcedido": 0,
-  "pergunta": "Qual das opções é uma função crescente?",
-  "opcoes": ["y = -x", "y = x²", "y = x", "y = -x²"]
+  "xpConcedido": 0
 }
 ```
-
-`pergunta`/`opcoes` só existem em tarefas geradas pela IA (RN20). Tarefas criadas manualmente
-(`POST /rotinas/:id/tarefas`) não têm questão: `pergunta` vem `null`, `opcoes` vem `[]`.
-Não existe campo `respostaCorreta` na resposta — a API nunca a expõe (ver `PATCH .../concluir`).
 
 ### `PUT /api/tarefas/:id`
 
@@ -319,31 +310,22 @@ Remove a tarefa e recalcula o progresso da rotina. (RF07, RN03)
 
 ### `PATCH /api/tarefas/:id/concluir`
 
-Conclui a tarefa e dispara a gamificação. (RF08, RN07–RN13, RN20)
+Conclui a tarefa e dispara a gamificação. (RF08, RN07–RN13)
 
-**Request** — corpo opcional:
-```json
-{ "respostaSelecionada": 2 }
-```
+Sem corpo.
 
-- **Tarefa sem `pergunta`** (criada manualmente): corpo é ignorado, conclui direto — igual ao comportamento antigo.
-- **Tarefa com `pergunta`** (gerada pela IA): `respostaSelecionada` (índice em `opcoes`, 0-based) é **obrigatório**.
-  - Sem `respostaSelecionada` → `400 RESPOSTA_OBRIGATORIA`.
-  - Resposta **errada** → **não conclui**, `200` com `{ "concluida": false, "correta": false, ... }`. Sem penalidade, sem limite de tentativas — pode chamar de novo com outro índice.
-  - Resposta **certa** → conclui normalmente, `200` com `{ "concluida": true, "correta": true, "xpConcedido": 10, ... }`.
-
-Efeitos ao concluir (resposta certa, ou tarefa sem pergunta, ainda não concluída):
+Efeitos (para tarefa ainda não concluída):
 
 1. `concluida = true`, `dataConclusao = agora`, `xpConcedido = 10`.
 2. `usuario.xpTotal += 10`; `streakAtual` recalculado; `ultimaAtividade = agora`.
 3. `progresso` da rotina recalculado.
 4. **Após o commit:** checa a condição do desafio adaptativo (RN13) — best-effort.
 
-**Idempotente:** concluir uma tarefa já concluída retorna a tarefa como está (sem `correta`), **sem** repetir XP/streak — mesmo se vier `respostaSelecionada` no corpo.
+**Idempotente:** concluir uma tarefa já concluída retorna a tarefa como está, **sem** repetir XP/streak.
 
-**200** — objeto `Tarefa` **sem** `respostaCorreta`, mais `correta` (só presente quando a tarefa tinha pergunta: `true` se concluiu por ter acertado, `false` se errou).
+**200** — objeto `Tarefa` (com `concluida: true`, `xpConcedido: 10`).
 
-**Erros:** `400 RESPOSTA_OBRIGATORIA` (tarefa com pergunta, sem `respostaSelecionada`) · `400 VALIDACAO` (`respostaSelecionada` num formato inválido) · `404 TAREFA_NAO_ENCONTRADA` · `403 TAREFA_ACESSO_NEGADA`.
+**Erros:** `404 TAREFA_NAO_ENCONTRADA` · `403 TAREFA_ACESSO_NEGADA`.
 
 > A conclusão **nunca** falha por causa da IA: se a geração do desafio adaptativo der erro, ela é apenas registrada no log do servidor e a tarefa é concluída normalmente.
 
@@ -410,7 +392,6 @@ Soma o `xpConcedido` das tarefas concluídas na **semana corrente** (segunda a d
 |---|---|---|
 | 400 | `VALIDACAO` | corpo reprovado por um schema Zod |
 | 400 | `ROTINA_SEM_TAREFA` | tentativa de remover a última tarefa da rotina (RN03) |
-| 400 | `RESPOSTA_OBRIGATORIA` | concluir tarefa com pergunta sem enviar `respostaSelecionada` (RN20) |
 | 401 | `NAO_AUTENTICADO` | token ausente, malformado, inválido ou expirado |
 | 403 | `ROTINA_ACESSO_NEGADO` | rotina pertence a outro usuário |
 | 403 | `TAREFA_ACESSO_NEGADA` | tarefa pertence a outro usuário |
