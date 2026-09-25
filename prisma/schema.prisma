@@ -22,6 +22,7 @@ model Usuario {
   rotinas         Rotina[]
   desafios        Desafio[]
   usosIA          UsoIA[]
+  historicoXP     HistoricoXP[]
 }
 
 model Rotina {
@@ -76,4 +77,21 @@ model UsoIA {
   usuario   Usuario @relation(fields: [usuarioId], references: [id])
 
   @@unique([usuarioId, dia])
+}
+
+// Declarada aqui só para manter schema.prisma == estado real do banco
+// (migration já aplicada por um branch separado, fix/ranking-sobrevive-exclusao-rotina,
+// que corrige o ranking semanal — RN14 — pra sobreviver à exclusão de rotina/tarefa).
+// Nenhum código deste branch grava ou lê daqui; a lógica de negócio entra
+// quando aquele PR for mergeado. Não remover essa tabela sem checar se esse
+// PR já foi mergeado.
+model HistoricoXP {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  xp          Int
+  dataCriacao DateTime @default(now())
+
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataCriacao])
 }
