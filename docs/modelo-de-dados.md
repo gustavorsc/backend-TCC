@@ -130,8 +130,9 @@ Em `prisma/migrations/`, aplicadas na Supabase:
 | `20260902181806_init` | `Usuario`, `Rotina`, `Tarefa`, `Desafio` |
 | `20260902183752_add_tarefa_data_criacao` | `Tarefa.dataCriacao` (base da condição do desafio adaptativo) |
 | `20260903182503_add_uso_ia` | tabela `UsoIA` + relação em `Usuario` |
-| `20260924174624_add_tarefa_questao` | `Tarefa.pergunta`/`opcoes`/`respostaCorreta` (RN20) |
+| `20260924174624_add_tarefa_questao` | `Tarefa.pergunta`/`opcoes`/`respostaCorreta` (RN20) — **revertida**, ver abaixo |
 | `20260924182456_add_historico_xp` | tabela `HistoricoXP` — desacopla o ranking semanal (RN14) da `Tarefa` |
+| `20260925183827_revert_tarefa_questao_multipla_escolha` | desfaz a anterior: `DROP COLUMN` de `pergunta`/`opcoes`/`respostaCorreta` em `Tarefa` (RN20 removida do produto) |
 
 Fluxo: editar `schema.prisma` → `npx prisma migrate dev --name <nome>` (usa `DIRECT_URL`).
 Ao mudar o schema, atualizar também a seção de modelo de dados do `../CLAUDE.md`.
