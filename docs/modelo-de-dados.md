@@ -12,7 +12,9 @@ Usuario ──1:N──► Rotina ──1:N──► Tarefa
    │
    ├──1:N──► Desafio
    │
-   └──1:N──► UsoIA        (contador da RN15; @@unique([usuarioId, dia]))
+   ├──1:N──► UsoIA         (contador da RN15; @@unique([usuarioId, dia]))
+   │
+   └──1:N──► HistoricoXP   (registro permanente de XP; base do ranking, RN14)
 ```
 
 ## Entidades
@@ -85,19 +87,39 @@ Incrementada via `upsert` atômico **antes** de chamar a OpenAI. Linhas antigas 
 são limpas (servem de histórico de uso). São apagadas junto com a conta em
 `DELETE /api/usuarios/me`.
 
-## Ranking não é tabela
+### HistoricoXP
 
-`GET /api/ranking` calcula na hora: `Tarefa` com `dataConclusao` na semana corrente
-→ `xpConcedido` somado por usuário (via `Rotina.usuarioId`) → ordenado desc. Não há
-entidade `Ranking` nem cache.
+Registro permanente de cada concessão de XP — base do ranking semanal (RN14).
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `id` | `String` uuid | PK |
+| `usuarioId` | `String` | FK → Usuario |
+| `xp` | `Int` | quantidade concedida (hoje sempre `XP_POR_TAREFA` = 10) |
+| `dataCriacao` | `DateTime` = now() | usada pra filtrar a semana corrente no ranking (índice) |
+
+Gravada dentro da mesma transação que incrementa `Usuario.xpTotal`
+(`tarefa.service.concluir`) — nunca criada, editada ou apagada em nenhum outro
+lugar. **Diferente de `Tarefa`, nunca é removida quando uma rotina é excluída** —
+é por isso que existe: pra desacoplar o ranking semanal do ciclo de vida da
+`Tarefa`/`Rotina`. Apagada junto com a conta em `DELETE /api/usuarios/me`.
+
+## Ranking não é tabela (de posições) — mas depende de HistoricoXP
+
+`GET /api/ranking` calcula na hora: soma `HistoricoXP.xp` com `dataCriacao` na
+semana corrente, por usuário, ordenado desc. Não há entidade `Ranking` nem cache
+— mas ao contrário da versão anterior (que somava direto de `Tarefa`), agora **não
+depende mais de `Tarefa` existir**: apagar uma rotina/tarefa depois de concluída
+não tira o XP dela do ranking daquela semana, só como `Usuario.xpTotal` (o total
+permanente) já não era afetado.
 
 ## Regras de exclusão (foreign keys)
 
 Não há `onDelete: Cascade`. As exclusões são feitas explicitamente em transação,
 na ordem certa:
 
-- **`DELETE /api/rotinas/:id`**: `tarefas` da rotina → `rotina`.
-- **`DELETE /api/usuarios/me`**: `tarefas` (via rotinas do usuário) → `rotinas` → `desafios` → `usosIA` → `usuario`.
+- **`DELETE /api/rotinas/:id`**: `tarefas` da rotina → `rotina`. **Não** apaga `HistoricoXP` — de propósito (ver acima).
+- **`DELETE /api/usuarios/me`**: `tarefas` (via rotinas do usuário) → `rotinas` → `desafios` → `usosIA` → `historicoXP` → `usuario`.
 
 ## Migrations
 
@@ -108,6 +130,8 @@ Em `prisma/migrations/`, aplicadas na Supabase:
 | `20260902181806_init` | `Usuario`, `Rotina`, `Tarefa`, `Desafio` |
 | `20260902183752_add_tarefa_data_criacao` | `Tarefa.dataCriacao` (base da condição do desafio adaptativo) |
 | `20260903182503_add_uso_ia` | tabela `UsoIA` + relação em `Usuario` |
+| `20260924174624_add_tarefa_questao` | `Tarefa.pergunta`/`opcoes`/`respostaCorreta` (RN20) |
+| `20260924182456_add_historico_xp` | tabela `HistoricoXP` — desacopla o ranking semanal (RN14) da `Tarefa` |
 
 Fluxo: editar `schema.prisma` → `npx prisma migrate dev --name <nome>` (usa `DIRECT_URL`).
 Ao mudar o schema, atualizar também a seção de modelo de dados do `../CLAUDE.md`.

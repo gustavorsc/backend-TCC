@@ -118,11 +118,22 @@ model UsoIA {
 
   @@unique([usuarioId, dia])
 }
+
+model HistoricoXP {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  xp          Int
+  dataCriacao DateTime @default(now())
+
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataCriacao])
+}
 ```
 
 `UsoIA` implementa o contador da RN15: uma linha por usuário/dia, `contagem` incrementada (atômica, via `upsert`) a cada chamada liberada em `POST /api/rotinas/chat`. Linhas antigas não são limpas por rotina (servem de histórico de uso da IA), mas são apagadas junto com a conta em `DELETE /api/usuarios/me` (FK `onDelete: Restrict`). `Usuario` ganhou a relação `usosIA UsoIA[]`.
 
-Ranking não é tabela: consulta somando `Tarefa.xpConcedido` de tarefas com `dataConclusao` na semana corrente (segunda a domingo), agrupado por usuário via `Rotina.usuarioId` (RN14).
+`HistoricoXP` implementa a base do ranking (RN14): um registro por concessão de XP, gravado na mesma transação que incrementa `Usuario.xpTotal` (`tarefa.service.concluir`). Ranking não é tabela de posições: consulta somando `HistoricoXP.xp` com `dataCriacao` na semana corrente (segunda a domingo), agrupado por usuário. Ao contrário de `Tarefa`, **nunca é apagado quando uma rotina/tarefa é excluída** — só junto com a conta inteira — para que excluir uma rotina depois de concluída não tire o XP dela do ranking daquela semana.
 
 ## Autenticação (fluxo do backend)
 
@@ -167,7 +178,7 @@ Nunca vazar stack trace ou detalhes internos na resposta. Códigos HTTP: `400` v
 
 ## Regras de negócio — respeitar sempre
 
-RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) — **o conteúdo do desafio é gerado pela IA** (`ia.service.gerarDesafioAdaptativo`, validado por Zod, RN10); a checagem roda como efeito colateral best-effort de concluir tarefa, **fora da transação** (`desafio.service.processarDesafioAdaptativo`), e **não conta no limite da RN15** · RN14 ranking semanal (seg–dom) · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak — backend expõe `streakEmRisco` (bool) em `GET /api/usuarios/me/progresso`; `true` quando `streakAtual > 0` e a última atividade não foi hoje (`utils/streak.streakEmRisco`) · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui.
+RN01 e-mail único · RN02 acesso restrito a autenticados · RN03 rotina sempre com ≥1 tarefa · RN04 rotina pertence a 1 usuário · RN05 alterações salvas imediatamente · RN06 exclusão de rotina exige confirmação (no frontend; backend não decide isso) · RN07 só conclui tarefa existente · RN08 progresso recalculado automaticamente · RN09 XP só após conclusão · RN10 validar estrutura do retorno da IA antes de salvar/exibir · RN11 XP = 10 por tarefa (ajustável) · RN12 streak: mantido com ≥1 tarefa/dia civil, zera sem conclusão · RN13 desafio adaptativo: 3 tarefas do mesmo tema atrasadas em 14 dias (atrasada = `Tarefa.dataCriacao` há 14+ dias e ainda não concluída) — **o conteúdo do desafio é gerado pela IA** (`ia.service.gerarDesafioAdaptativo`, validado por Zod, RN10); a checagem roda como efeito colateral best-effort de concluir tarefa, **fora da transação** (`desafio.service.processarDesafioAdaptativo`), e **não conta no limite da RN15** · RN14 ranking semanal (seg–dom) — soma `HistoricoXP` (registro permanente de XP, não `Tarefa`), sobrevive à exclusão de rotina/tarefa · RN15 limite de chamadas à IA por usuário/período — **10 por dia civil**, contador em `UsoIA` (`IA_LIMITE_DIARIO` em `utils/constants.ts`), checado/reservado antes de chamar a OpenAI; estouro → `429 LIMITE_IA_DIARIO` · RN16 notificar risco de quebra de streak — backend expõe `streakEmRisco` (bool) em `GET /api/usuarios/me/progresso`; `true` quando `streakAtual > 0` e a última atividade não foi hoje (`utils/streak.streakEmRisco`) · RN17–RN19 validade/uso único/não revelação de e-mail no reset — **responsabilidade do Firebase**, não implementar aqui. RN20 (nova) — tarefas geradas pela IA trazem uma questão de múltipla escolha (`Tarefa.pergunta`/`opcoes`/`respostaCorreta`, gerada junto no chat, validada pelo RN10); `PATCH /api/tarefas/:id/concluir` exige acertar `respostaSelecionada` pra concluir — errar não penaliza, tentativas ilimitadas. Tarefas criadas manualmente (`POST /rotinas/:id/tarefas`) não têm questão e concluem direto, como antes. `respostaCorreta` nunca é exposta ao cliente (`omit` global do Prisma em `lib/prisma.ts`).
 
 **Dia civil / fuso:** todo cálculo de "dia civil" e de semana (streak RN12, contador diário RN15, semana do ranking RN14) usa o fuso **America/Sao_Paulo** (UTC−3 fixo — Brasil sem horário de verão), centralizado em `utils/tempo.ts` (`diaCivil`, `diferencaEmDiasCivis`, `limitesDaSemanaAtual`).
 

@@ -21,6 +21,9 @@ jest.mock("../../src/lib/prisma", () => {
       findFirst: jest.fn(),
       create: jest.fn(),
     },
+    historicoXP: {
+      create: jest.fn(),
+    },
     $transaction: jest.fn((arg: unknown) =>
       Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(client)
     ),
@@ -187,6 +190,9 @@ describe("tarefa.service", () => {
 
       expect(resultado.concluida).toBe(true);
       expect(prisma.usuario.update).not.toHaveBeenCalled();
+      expect(prisma.historicoXP.create).not.toHaveBeenCalled();
+      expect(resultado).not.toHaveProperty("rotina");
+      expect(resultado).not.toHaveProperty("respostaCorreta");
     });
 
     it("concede XP, atualiza o streak e recalcula o progresso ao concluir", async () => {
@@ -221,6 +227,9 @@ describe("tarefa.service", () => {
       expect(prisma.rotina.update).toHaveBeenCalledWith({
         where: { id: ROTINA_ID },
         data: { progresso: 100 },
+      });
+      expect(prisma.historicoXP.create).toHaveBeenCalledWith({
+        data: { usuarioId: USUARIO_ID, xp: XP_POR_TAREFA },
       });
       expect(resultado.xpConcedido).toBe(XP_POR_TAREFA);
       expect(prisma.desafio.create).not.toHaveBeenCalled();
@@ -277,6 +286,55 @@ describe("tarefa.service", () => {
 
       expect(resultado.concluida).toBe(true);
       expect(prisma.desafio.create).not.toHaveBeenCalled();
+    });
+
+    it("RN20: exige respostaSelecionada quando a tarefa tem questão", async () => {
+      (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
+        ...tarefaComQuestaoFixture(),
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
+      });
+
+      await expect(tarefaService.concluir(USUARIO_ID, TAREFA_ID)).rejects.toMatchObject({
+        statusCode: 400,
+        code: "RESPOSTA_OBRIGATORIA",
+      });
+      expect(prisma.tarefa.update).not.toHaveBeenCalled();
+    });
+
+    it("RN20: resposta errada não conclui, não concede XP e não penaliza", async () => {
+      (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
+        ...tarefaComQuestaoFixture(),
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
+      });
+
+      const resultado = await tarefaService.concluir(USUARIO_ID, TAREFA_ID, 0); // resposta certa é o índice 1
+
+      expect(resultado).toMatchObject({ concluida: false, correta: false });
+      expect(prisma.tarefa.update).not.toHaveBeenCalled();
+      expect(prisma.usuario.update).not.toHaveBeenCalled();
+      expect(prisma.historicoXP.create).not.toHaveBeenCalled();
+      expect(resultado).not.toHaveProperty("respostaCorreta");
+    });
+
+    it("RN20: resposta certa conclui normalmente e concede XP", async () => {
+      (prisma.tarefa.findUnique as jest.Mock).mockResolvedValue({
+        ...tarefaComQuestaoFixture(),
+        rotina: { usuarioId: USUARIO_ID, tema: "Matemática" },
+      });
+      (prisma.usuario.findUniqueOrThrow as jest.Mock).mockResolvedValue(usuarioFixture());
+      (prisma.tarefa.update as jest.Mock).mockResolvedValue(
+        tarefaComQuestaoFixture({ concluida: true, xpConcedido: XP_POR_TAREFA })
+      );
+      (prisma.tarefa.count as jest.Mock)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(0);
+
+      const resultado = await tarefaService.concluir(USUARIO_ID, TAREFA_ID, 1);
+
+      expect(resultado).toMatchObject({ concluida: true, correta: true, xpConcedido: XP_POR_TAREFA });
+      expect(resultado).not.toHaveProperty("respostaCorreta");
+      expect(prisma.usuario.update).toHaveBeenCalled();
     });
 
     it("RN13: não duplica desafio quando já existe um em aberto para o tema", async () => {

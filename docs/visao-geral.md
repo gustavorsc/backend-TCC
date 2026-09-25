@@ -91,7 +91,7 @@ Desafios são criados automaticamente pelo sistema (RN13), nunca pelo usuário.
 
 ### Ranking (`/api/ranking`)
 
-- **`GET /`** — ranking **semanal** de todos os usuários: soma do XP das tarefas concluídas na semana corrente (segunda a domingo, fuso de São Paulo), do maior para o menor. Não é uma tabela — é calculado on-the-fly.
+- **`GET /`** — ranking **semanal** de todos os usuários: soma do XP registrado (`HistoricoXP`) na semana corrente (segunda a domingo, fuso de São Paulo), do maior para o menor. Não é uma tabela de posições — é calculado on-the-fly, mas a partir de um registro permanente, não da `Tarefa`: excluir uma rotina/tarefa depois de concluída não tira o XP dela do ranking daquela semana.
 
 ### Saúde
 

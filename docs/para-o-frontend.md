@@ -17,7 +17,7 @@ persistência real no banco. Só falta deploy, se/quando for necessário.
 | Rotinas — CRUD (`GET`/`PUT`/`DELETE`, adicionar tarefa) | ✅ pronto e testado | |
 | Tarefas — editar, remover, **concluir** (XP/streak/progresso) | ✅ pronto e testado | conclusão é idempotente |
 | Desafios — listar, concluir | ✅ pronto e testado | criação é automática (RN13) |
-| Ranking semanal | ✅ pronto e testado | |
+| Ranking semanal | ✅ pronto e testado | corrigido em 24/09: agora sobrevive à exclusão de rotina/tarefa (antes o XP delas sumia do ranking) |
 | `POST /api/rotinas/chat` (gerar rotina com IA) | ✅ pronto e testado com OpenAI real | validado com modelo real + persistência real (23/09) |
 | Desafio adaptativo gerado por IA (RN13) | ✅ pronto e testado com OpenAI real | roda em background ao concluir tarefa |
 | Deploy / URL pública | ❌ ainda não | por enquanto só `localhost` |
